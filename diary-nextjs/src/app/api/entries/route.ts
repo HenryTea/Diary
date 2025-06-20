@@ -80,3 +80,20 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Failed to update entry.' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  const dbPath = path.join(process.cwd(), 'db', 'db.json');
+  try {
+    const body = await request.json();
+    const { id } = body;
+    const data = await fs.readFile(dbPath, 'utf-8');
+    const db = JSON.parse(data);
+    const entries: Entry[] = Array.isArray(db) ? db : db.entries || [];
+    const newEntries = entries.filter(entry => entry.id.toString() !== id.toString());
+    const newDb = Array.isArray(db) ? newEntries : { ...db, entries: newEntries };
+    await fs.writeFile(dbPath, JSON.stringify(newDb, null, 2), 'utf-8');
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete entry.' }, { status: 500 });
+  }
+}

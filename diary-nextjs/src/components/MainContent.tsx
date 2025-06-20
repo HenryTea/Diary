@@ -38,6 +38,17 @@ const MainContent: React.FC = () => {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this entry?")) {
+      await fetch("/api/entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      fetchEntries();
+    }
+  };
+
   return (
     <main className="pt-24 px-8 max-w-3xl mx-auto">
       <div className="sticky top-0 bg-[#e9f3f6] z-30 flex items-center justify-between mb-6 py-4" style={{marginLeft: 0, marginRight: 0}}>
@@ -80,9 +91,16 @@ const MainContent: React.FC = () => {
           sortedEntries.map(entry => (
             <div
               key={entry.id}
-              className="bg-[#f5fafc] text-white rounded p-4 cursor-pointer hover:bg-[#e0e7ef] transition-colors"
+              className="bg-[#f5fafc] text-white rounded p-4 cursor-pointer hover:bg-[#e0e7ef] transition-colors relative"
               onClick={() => window.location.href = `/entries/${entry.id}`}
             >
+              <button
+                className="absolute top-2 right-2 text-red-600 hover:bg-red-100 rounded p-1 z-10"
+                title="Delete entry"
+                onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
+              >
+                🗑️
+              </button>
               <div className="font-bold mb-1 text-[#7fc8de]">
                 {new Date(entry.date).toLocaleString('en-US', {
                   year: 'numeric', month: 'long', day: 'numeric',

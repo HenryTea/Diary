@@ -51,6 +51,17 @@ export default function EditEntryPage() {
     router.push("/");
   };
 
+  const handleDelete = async () => {
+    if (window.confirm("Are you sure you want to delete this entry?")) {
+      await fetch("/api/entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      router.push("/");
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
   if (!entry) return <div>Entry not found.</div>;
@@ -60,6 +71,13 @@ export default function EditEntryPage() {
       {/* Top Bar */}
       <div className="sticky top-0 z-40 w-full bg-[#e9f3f6] flex flex-col items-center border-b border-gray-200">
         <div className="w-full flex justify-between items-center px-4 py-2">
+          <button
+            className="text-2xl text-red-600 hover:bg-red-100 rounded transition-colors px-2 py-1 mr-2"
+            onClick={handleDelete}
+            title="Delete entry"
+          >
+            🗑️
+          </button>
           {text !== entry.text ? (
             <button
               className="flex items-center hover:bg-green-100 rounded transition-colors px-2 py-1"
