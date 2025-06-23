@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -74,7 +74,7 @@ export default function NewEntryPage() {
           <button className="text-xl">🏃</button>
           <button className="text-xl">🏷️</button>
         </div>
-        <div className="text-xs text-gray-500">Words 0 · Characters 0</div>
+        <div className="text-xs text-gray-500">Words {entry.trim().split(/\s+/).filter(Boolean).length} · Characters {entry.length}</div>
       </div>
     </div>
   );

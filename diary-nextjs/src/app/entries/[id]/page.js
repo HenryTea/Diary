@@ -1,28 +1,22 @@
-"use client";
+'use client';
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-
-interface Entry {
-  id: string | number;
-  date: string;
-  text: string;
-}
 
 export default function EditEntryPage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
-  const [entry, setEntry] = useState<Entry | null>(null);
+  const [entry, setEntry] = useState(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchEntry = async () => {
       setLoading(true);
       try {
         const res = await fetch("/api/entries");
-        const data: Entry[] = await res.json();
+        const data = await res.json();
         const found = data.find((e) => e.id.toString() === id);
         if (!found) throw new Error("Entry not found");
         setEntry(found);
@@ -44,7 +38,6 @@ export default function EditEntryPage() {
         body: JSON.stringify({ id, text }),
       });
       if (res.ok) {
-        // Update entry in state for real-time UI update
         setEntry((prev) => (prev ? { ...prev, text } : prev));
       }
     }
@@ -122,18 +115,10 @@ export default function EditEntryPage() {
         <div className="flex items-center gap-2 py-2">
           <button className="px-2 py-1 rounded hover:bg-gray-200">+</button>
           <button className="px-2 py-1 rounded hover:bg-gray-200">T</button>
-          <button className="px-2 py-1 rounded hover:bg-gray-200">
-            &#8226;&#8226;&#8226;
-          </button>
-          <button className="px-2 py-1 rounded hover:bg-gray-200 font-bold">
-            B
-          </button>
-          <button className="px-2 py-1 rounded hover:bg-gray-200 italic">
-            I
-          </button>
-          <button className="px-2 py-1 rounded hover:bg-gray-200 underline">
-            U
-          </button>
+          <button className="px-2 py-1 rounded hover:bg-gray-200">333</button>
+          <button className="px-2 py-1 rounded hover:bg-gray-200 font-bold">B</button>
+          <button className="px-2 py-1 rounded hover:bg-gray-200 italic">I</button>
+          <button className="px-2 py-1 rounded hover:bg-gray-200 underline">U</button>
           <button className="px-2 py-1 rounded hover:bg-gray-200">🎨</button>
           <button className="px-2 py-1 rounded hover:bg-gray-200">✏️</button>
           <button className="px-2 py-1 rounded hover:bg-gray-200">👁️</button>
@@ -159,12 +144,7 @@ export default function EditEntryPage() {
           <button className="text-xl">🏷️</button>
         </div>
         <div className="text-xs text-gray-500">
-          Words{" "}
-          {text
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean).length}{" "}
-          · Characters {text.length}
+          Words {text.trim().split(/\s+/).filter(Boolean).length} · Characters {text.length}
         </div>
       </div>
     </div>

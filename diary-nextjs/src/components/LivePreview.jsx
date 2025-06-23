@@ -1,10 +1,6 @@
 import React from 'react';
 
-interface LivePreviewProps {
-  text: string;
-}
-
-const LivePreview: React.FC<LivePreviewProps> = ({ text }) => {
+export default function LivePreview({ text }) {
   if (!text.trim()) return null;
   const firstLine = text.split('\n')[0];
   let display = firstLine;
@@ -29,6 +25,4 @@ const LivePreview: React.FC<LivePreviewProps> = ({ text }) => {
       {display}
     </div>
   );
-};
-
-export default LivePreview;
+}

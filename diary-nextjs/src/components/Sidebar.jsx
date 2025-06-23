@@ -1,26 +1,14 @@
+'use client';
 import React, { useState } from 'react';
 
 const menuItems = [
-  {
-    name: 'Home',
-    icon: '/home.svg',
-    active: true,
-  },
-  {
-    name: 'Media',
-    icon: '/media.svg',
-    active: false,
-  },
-  {
-    name: 'Setting',
-    icon: '/setting.svg',
-    active: false,
-  },
+  { name: 'Home', icon: '/home.svg', active: true },
+  { name: 'Media', icon: '/media.svg', active: false },
+  { name: 'Setting', icon: '/setting.svg', active: false },
 ];
 
-const Sidebar: React.FC = () => {
+export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
-
   return (
     <div
       className={`fixed top-0 left-0 h-full bg-[#f5fafc] transition-all duration-300 border-r border-gray-200 ${expanded ? 'w-[20vw]' : 'w-[4vw]'} z-50`}
@@ -49,6 +37,4 @@ const Sidebar: React.FC = () => {
       </nav>
     </div>
   );
-};
-
-export default Sidebar; 
+}

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 import React from 'react';
 import { useRouter } from 'next/navigation';
 
-const NewEntryButton: React.FC = () => {
+export default function NewEntryButton() {
   const router = useRouter();
   return (
     <button
@@ -12,6 +12,4 @@ const NewEntryButton: React.FC = () => {
       <span className="mr-2 text-2xl">+</span> NEW
     </button>
   );
-};
-
-export default NewEntryButton; 
+}

@@ -1,18 +1,11 @@
-"use client";
-
+'use client';
 import React, { useState, useEffect } from 'react';
 
-interface Entry {
-  id: string;
-  date: string;
-  text: string;
-}
-
-const MainContent: React.FC = () => {
+export default function MainContent() {
   const [sortAsc, setSortAsc] = useState(true);
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -38,7 +31,7 @@ const MainContent: React.FC = () => {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
       await fetch("/api/entries", {
         method: "DELETE",
@@ -131,6 +124,4 @@ const MainContent: React.FC = () => {
       </div>
     </main>
   );
-};
-
-export default MainContent;
+}
