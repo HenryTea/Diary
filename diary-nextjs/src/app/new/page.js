@@ -83,7 +83,7 @@ export default function NewEntryPage() {
               </span>
             </span>
           </button>
-          <span className="text-xs font-semibold tracking-widest mr-50">{new Date().toLocaleString("en-US")}</span>
+          <span className="text-xs font-semibold tracking-widest">{new Date().toLocaleString("en-US")}</span>
           <div className="w-8" />
         </div>
         <div className="flex items-center gap-2 py-2">
