@@ -1,36 +1,268 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📖 Diary Next.js
 
-## Getting Started
+A modern, feature-rich diary application built with Next.js 15, featuring a powerful rich text editor with advanced formatting capabilities.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-15.3.3-000000?style=flat-square&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19.0.0-61DAFB?style=flat-square&logo=react&logoColor=black)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## ✨ Features
+
+### 📝 Rich Text Editor
+- **Advanced Formatting**: Bold, italic, underline, color picker
+- **Font Management**: Google Fonts integration with custom font support
+- **Font Size Control**: Preset sizes and custom input
+- **Real-time Preview**: WYSIWYG editing experience
+- **Auto-save Detection**: Smart dirty state tracking
+
+### 🎨 Customization
+- **Custom Fonts**: Add fonts via URL with live preview
+- **Color Picker**: Full color customization for text
+- **Font Families**: Access to 50+ Google Fonts
+- **Recently Used**: Quick access to recently used fonts
+
+### 🗂️ Entry Management
+- **Create Entries**: Rich text editor for new diary entries
+- **Edit Entries**: Full editing capabilities for existing entries
+- **Delete Entries**: Safe deletion with confirmation
+- **Auto-save**: Automatic saving with visual feedback
+
+### 🔧 Technical Features
+- **Modular Architecture**: Clean, maintainable component structure
+- **Custom Hooks**: Reusable logic with `useRichTextEditor`
+- **Utility Functions**: Centralized formatting utilities
+- **Responsive Design**: Works on all screen sizes
+- **Modern UI**: Clean, intuitive interface
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd diary-nextjs
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start development server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser**
+   ```
+   http://localhost:3000
+   ```
+
+### Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+## 📁 Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   └── entries/       # Entry CRUD operations
+│   ├── entries/           # Entry pages
+│   │   └── [id]/          # Dynamic entry editor
+│   ├── globals.css        # Global styles
+│   ├── layout.js          # Root layout
+│   └── page.js            # Home page
+├── components/            # React components
+│   ├── editor/            # Rich text editor components
+│   │   ├── ColorPicker.jsx
+│   │   ├── CustomFontDialog.jsx
+│   │   ├── FontSelector.jsx
+│   │   ├── FontSizeSelector.jsx
+│   │   ├── FormattingToolbar.jsx
+│   │   └── TextFormattingButtons.jsx
+│   ├── ui/                # UI components
+│   │   └── SaveButton.jsx
+│   ├── Header.jsx         # App header
+│   ├── MainContent.jsx    # Main content area
+│   ├── NewEntryButton.jsx # New entry button
+│   └── Sidebar.jsx        # Navigation sidebar
+├── hooks/                 # Custom React hooks
+│   └── useRichTextEditor.js
+├── utils/                 # Utility functions
+│   └── editorUtils.js
+└── db/                    # Database files
+    ├── db.csv
+    ├── db.js
+    └── db.json
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎯 Component Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Core Components
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+#### `FormattingToolbar`
+Central toolbar containing all formatting controls:
+- Font selection and management
+- Font size controls
+- Text formatting buttons (bold, italic, underline)
+- Color picker
 
-## Learn More
+#### `useRichTextEditor` Hook
+Custom hook managing all editor state:
+- Font and formatting state
+- Custom font management
+- Editor content handling
+- Dirty state tracking
 
-To learn more about Next.js, take a look at the following resources:
+#### `SaveButton`
+Smart save button with animated states:
+- Shows "Back" when content is unchanged
+- Shows "Save" when content is dirty
+- Supports custom save text ("Create" vs "Save")
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Editor Components
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Component | Purpose |
+|-----------|---------|
+| `FontSelector` | Google Fonts dropdown with custom font option |
+| `FontSizeSelector` | Preset sizes + custom input |
+| `TextFormattingButtons` | Bold, italic, underline controls |
+| `ColorPicker` | Color selection for text |
+| `CustomFontDialog` | Add custom fonts via URL |
 
-## Deploy on Vercel
+## 🔗 API Routes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### `/api/entries`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Method | Description | Body |
+|--------|-------------|------|
+| `GET` | Retrieve all entries | - |
+| `POST` | Create new entry | `{ text, isRichText }` |
+| `PUT` | Update entry | `{ id, text, isRichText }` |
+| `DELETE` | Delete entry | `{ id }` |
+
+## 🎨 Styling
+
+- **Framework**: TailwindCSS 4.0
+- **Design**: Custom color scheme with soft blues and greens
+- **Typography**: Geist Sans and Geist Mono fonts
+- **Responsive**: Mobile-first approach
+- **Animations**: Smooth transitions and micro-interactions
+
+### Color Palette
+- Primary Background: `#f5fafc`
+- Secondary Background: `#e9f3f6`
+- Accent: `#b3e6fa`
+- Text: Custom black/gray variants
+
+## 🚦 Usage
+
+### Creating a New Entry
+1. Click the "NEW" button (floating action button)
+2. Use the rich text editor with full formatting capabilities
+3. Click "Create and back to Entries" to save
+
+### Editing an Entry
+1. Click on any existing entry
+2. Edit with the same rich text editor
+3. Click "Save and back to Entries" to update
+
+### Formatting Features
+- **Bold/Italic/Underline**: Use toolbar buttons
+- **Font**: Select from Google Fonts or add custom fonts
+- **Font Size**: Choose preset or enter custom size
+- **Colors**: Use color picker for text color
+- **Custom Fonts**: Add any font via URL
+
+## 🔧 Configuration
+
+### Adding New Fonts
+The app supports Google Fonts and custom fonts:
+
+```javascript
+// Google Fonts are automatically loaded
+const GOOGLE_FONTS = [
+  'Arial', 'Georgia', 'Times New Roman',
+  'Helvetica', 'Roboto', 'Open Sans',
+  // ... more fonts
+];
+
+// Custom fonts via URL
+const customFont = {
+  name: 'Custom Font',
+  url: 'https://fonts.googleapis.com/css2?family=CustomFont'
+};
+```
+
+### Database Configuration
+Currently uses JSON file storage. Can be easily migrated to:
+- PostgreSQL
+- MySQL
+- MongoDB
+- Any other database
+
+## 🛠️ Development
+
+### Adding New Components
+1. Create component in appropriate directory
+2. Export from component
+3. Import in parent component
+4. Add to FormattingToolbar if it's an editor feature
+
+### Modifying Editor Behavior
+Main editor logic is in:
+- `hooks/useRichTextEditor.js` - State management
+- `utils/editorUtils.js` - Formatting utilities
+
+### Styling Guidelines
+- Use TailwindCSS classes
+- Follow existing color scheme
+- Maintain responsive design
+- Add hover states for interactive elements
+
+## 📱 Browser Support
+
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+
+## 🐛 Known Issues
+
+- TypeScript type checking is disabled for build compatibility
+- Some Turbopack compatibility issues (use regular Next.js dev server)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make changes following the existing code style
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is private and not licensed for public use.
+
+## 🙏 Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- Styled with [TailwindCSS](https://tailwindcss.com/)
+- Fonts from [Google Fonts](https://fonts.google.com/)
+- Icons and UI inspired by modern design principles
+
+---
+
+Made with ❤️ using Next.js and React

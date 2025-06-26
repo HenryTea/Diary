@@ -1,6 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Head from 'next/head';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,13 +11,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const metadata = {
+  title: "Diary App",
+  description: "A rich text diary application",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#e9f3f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#f5fafc" }
+  ]
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <Head>
-        <meta name="theme-color" content="#f5fafc" />
-        <meta name="theme-color" media="(prefers-color-scheme:light)" content="#e9f3f6" />
-      </Head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
