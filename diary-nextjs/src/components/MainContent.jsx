@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { stripHtmlTags } from '../utils/editorUtils';
 
 export default function MainContent() {
   const [sortAsc, setSortAsc] = useState(true);
@@ -111,11 +112,13 @@ export default function MainContent() {
                 }}
               >
                 {(() => {
-                  const firstLine = entry.text.split('\n')[0];
+                  // Strip HTML tags and get plain text
+                  const plainText = stripHtmlTags(entry.text || '');
+                  const firstLine = plainText.split('\n')[0];
                   if (firstLine.length > 30) {
                     return firstLine.slice(0, 30) + '...';
                   }
-                  return firstLine;
+                  return firstLine || 'Empty entry';
                 })()}
               </div>
             </div>

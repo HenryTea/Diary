@@ -217,7 +217,6 @@ export default function Page() {
           customFonts={editor.customFonts}
           recentlyUsedFonts={editor.recentlyUsedFonts}
           onShowFontDialog={() => editor.setShowFontDialog(true)}
-          onRemoveCustomFont={editor.handleRemoveCustomFont}
           
           // Font size props
           fontSizeSelected={editor.fontSizeSelected}

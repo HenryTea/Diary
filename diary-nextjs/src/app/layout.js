@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Diary App",
-  description: "A rich text diary application",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#e9f3f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#f5fafc" }
-  ]
+  description: "A rich text diary application"
+};
+
+export const viewport = {
+  themeColor: "#e9f3f6"
 };
 
 export default function RootLayout({ children }) {
