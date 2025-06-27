@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Font Persistence Test</title>
+</head>
+<body>
+    <h1>Test Font Persistence</h1>
+    <div id="output"></div>
+    <script>
+        // Test localStorage functionality
+        const testFonts = [
+            { name: "Roboto Mono", url: "https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap", dateAdded: "2025-06-27" },
+            { name: "Dancing Script", url: "https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap", dateAdded: "2025-06-27" }
+        ];
+
+        // Save test fonts
+        localStorage.setItem('diary-custom-fonts', JSON.stringify(testFonts));
+        localStorage.setItem('diary-recent-fonts', JSON.stringify(['Arial', 'Georgia']));
+
+        // Load and display
+        const savedFonts = JSON.parse(localStorage.getItem('diary-custom-fonts') || '[]');
+        const recentFonts = JSON.parse(localStorage.getItem('diary-recent-fonts') || '[]');
+
+        document.getElementById('output').innerHTML = `
+            <h2>Saved Custom Fonts:</h2>
+            <pre>${JSON.stringify(savedFonts, null, 2)}</pre>
+            <h2>Recent Fonts:</h2>
+            <pre>${JSON.stringify(recentFonts, null, 2)}</pre>
+        `;
+
+        console.log('Custom Fonts:', savedFonts);
+        console.log('Recent Fonts:', recentFonts);
+    </script>
+</body>
+</html>

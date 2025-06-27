@@ -17,6 +17,65 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
   const [customFontName, setCustomFontName] = useState("");
   const [customFonts, setCustomFonts] = useState([]);
   const [recentlyUsedFonts, setRecentlyUsedFonts] = useState([]);
+
+  // Load custom fonts from localStorage on mount
+  useEffect(() => {
+    const loadSavedFonts = () => {
+      try {
+        const savedFonts = localStorage.getItem('diary-custom-fonts');
+        const savedRecentFonts = localStorage.getItem('diary-recent-fonts');
+        
+        if (savedFonts) {
+          const parsedFonts = JSON.parse(savedFonts);
+          setCustomFonts(parsedFonts);
+          
+          // Re-load font styles for saved fonts
+          parsedFonts.forEach(fontData => {
+            if (fontData.url) {
+              const linkId = `custom-font-${fontData.name.replace(/\s+/g, '-').toLowerCase()}`;
+              if (!document.getElementById(linkId)) {
+                const link = document.createElement('link');
+                link.id = linkId;
+                link.rel = 'stylesheet';
+                link.href = fontData.url;
+                document.head.appendChild(link);
+              }
+            }
+          });
+        }
+        
+        if (savedRecentFonts) {
+          setRecentlyUsedFonts(JSON.parse(savedRecentFonts));
+        }
+      } catch (error) {
+        console.error('Error loading saved fonts:', error);
+      }
+    };
+
+    loadSavedFonts();
+  }, []);
+
+  // Save custom fonts to localStorage whenever they change
+  useEffect(() => {
+    if (customFonts.length > 0) {
+      try {
+        localStorage.setItem('diary-custom-fonts', JSON.stringify(customFonts));
+      } catch (error) {
+        console.error('Error saving custom fonts:', error);
+      }
+    }
+  }, [customFonts]);
+
+  // Save recently used fonts to localStorage whenever they change
+  useEffect(() => {
+    if (recentlyUsedFonts.length > 0) {
+      try {
+        localStorage.setItem('diary-recent-fonts', JSON.stringify(recentlyUsedFonts));
+      } catch (error) {
+        console.error('Error saving recent fonts:', error);
+      }
+    }
+  }, [recentlyUsedFonts]);
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
@@ -87,7 +146,8 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
         let fontFamily = computed.fontFamily;
         fontFamily = fontFamily.replace(/['"]/g, '').split(',')[0].trim();
         
-        const allFonts = ['inherit', ...GOOGLE_FONTS, ...customFonts, ...recentlyUsedFonts];
+        const customFontNames = customFonts.map(font => typeof font === 'string' ? font : font.name);
+        const allFonts = ['inherit', ...GOOGLE_FONTS, ...customFontNames, ...recentlyUsedFonts];
         const matchedFont = allFonts.find(font => {
           if (font === 'inherit') return fontFamily.includes('inherit') || fontFamily.includes('system');
           return fontFamily.toLowerCase().includes(font.toLowerCase()) || font.toLowerCase().includes(fontFamily.toLowerCase());
@@ -131,6 +191,17 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     let finalUrl = customFontUrl.trim();
     let finalName = customFontName.trim();
     
+    if (!finalName || !finalUrl) return;
+    
+    // Check if font already exists
+    const fontExists = customFonts.some(font => 
+      (typeof font === 'string' ? font : font.name) === finalName
+    );
+    if (fontExists) {
+      alert('Font already exists!');
+      return;
+    }
+    
     if (finalUrl.includes('fonts.google.com/specimen/')) {
       const fontNameFromUrl = finalUrl.split('/specimen/')[1];
       if (fontNameFromUrl) {
@@ -151,10 +222,50 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
       document.head.appendChild(link);
     }
     
-    setCustomFonts(prev => [...prev, finalName]);
+    // Save font with both name and URL for persistence
+    const newFont = {
+      name: finalName,
+      url: finalUrl,
+      dateAdded: new Date().toISOString()
+    };
+    
+    setCustomFonts(prev => [...prev, newFont]);
     setCustomFontUrl("");
     setCustomFontName("");
     setShowFontDialog(false);
+  };
+
+  const handleRemoveCustomFont = (fontToRemove) => {
+    const fontName = typeof fontToRemove === 'string' ? fontToRemove : fontToRemove.name;
+    
+    // Remove from custom fonts
+    setCustomFonts(prev => prev.filter(font => 
+      (typeof font === 'string' ? font : font.name) !== fontName
+    ));
+    
+    // Remove from recently used fonts
+    setRecentlyUsedFonts(prev => prev.filter(font => font !== fontName));
+    
+    // Remove CSS link from document head
+    const linkId = `custom-font-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
+    const linkElement = document.getElementById(linkId);
+    if (linkElement) {
+      linkElement.remove();
+    }
+  };
+
+  const clearAllCustomFonts = () => {
+    // Clear localStorage
+    localStorage.removeItem('diary-custom-fonts');
+    localStorage.removeItem('diary-recent-fonts');
+    
+    // Clear state
+    setCustomFonts([]);
+    setRecentlyUsedFonts([]);
+    
+    // Remove all custom font CSS links
+    const customFontLinks = document.querySelectorAll('link[id^="custom-font-"]');
+    customFontLinks.forEach(link => link.remove());
   };
 
   return {
@@ -197,6 +308,8 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     // Functions
     handleHtmlChange,
     handleFontUrlChange,
-    handleAddCustomFont
+    handleAddCustomFont,
+    handleRemoveCustomFont,
+    clearAllCustomFonts
   };
 };

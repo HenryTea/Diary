@@ -7,12 +7,29 @@ export default function FontSelector({
   GOOGLE_FONTS,
   customFonts,
   recentlyUsedFonts,
-  onShowFontDialog
+  onShowFontDialog,
+  onRemoveCustomFont
 }) {
+  const getFontName = (font) => {
+    return typeof font === 'string' ? font : font.name;
+  };
+
+  const handleFontChange = (value) => {
+    if (value.startsWith('remove-')) {
+      const fontToRemove = value.replace('remove-', '');
+      const fontObject = customFonts.find(font => getFontName(font) === fontToRemove);
+      if (fontObject && window.confirm(`Remove "${getFontName(fontObject)}" from custom fonts?`)) {
+        onRemoveCustomFont(fontObject);
+      }
+      return;
+    }
+    onFontChange(value);
+  };
+
   return (
     <select
       className="px-2 py-1 rounded border border-gray-300"
-      onChange={e => onFontChange(e.target.value)}
+      onChange={e => handleFontChange(e.target.value)}
       value={selectedFont}
       style={{ minWidth: 120 }}
     >
@@ -41,11 +58,27 @@ export default function FontSelector({
       {customFonts.length > 0 && (
         <>
           <option disabled>────────</option>
-          {customFonts.map(font => (
-            <option key={`custom-${font}`} value={font} style={{ fontFamily: font }}>
-              {font} (Custom)
-            </option>
-          ))}
+          {customFonts.map(font => {
+            const fontName = getFontName(font);
+            return (
+              <optgroup key={`custom-group-${fontName}`} label={`${fontName} (Custom)`}>
+                <option 
+                  key={`custom-${fontName}`} 
+                  value={fontName} 
+                  style={{ fontFamily: fontName }}
+                >
+                  {fontName}
+                </option>
+                <option 
+                  key={`remove-${fontName}`} 
+                  value={`remove-${fontName}`}
+                  style={{ color: '#dc2626', fontSize: '0.9em' }}
+                >
+                  🗑️ Remove {fontName}
+                </option>
+              </optgroup>
+            );
+          })}
         </>
       )}
       

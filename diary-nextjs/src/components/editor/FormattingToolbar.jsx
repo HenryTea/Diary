@@ -13,6 +13,7 @@ export default function FormattingToolbar({
   customFonts,
   recentlyUsedFonts,
   onShowFontDialog,
+  onRemoveCustomFont,
   
   // Font size props
   fontSizeSelected,
@@ -45,6 +46,7 @@ export default function FormattingToolbar({
         customFonts={customFonts}
         recentlyUsedFonts={recentlyUsedFonts}
         onShowFontDialog={onShowFontDialog}
+        onRemoveCustomFont={onRemoveCustomFont}
       />
       
       <FontSizeSelector

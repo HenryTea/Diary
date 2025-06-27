@@ -16,10 +16,11 @@ A modern, feature-rich diary application built with Next.js 15, featuring a powe
 - **Auto-save Detection**: Smart dirty state tracking
 
 ### 🎨 Customization
-- **Custom Fonts**: Add fonts via URL with live preview
+- **Custom Fonts**: Add fonts via URL with live preview and persistent storage
 - **Color Picker**: Full color customization for text
 - **Font Families**: Access to 50+ Google Fonts
 - **Recently Used**: Quick access to recently used fonts
+- **Font Management**: Remove custom fonts with confirmation dialog
 
 ### 🗂️ Entry Management
 - **Create Entries**: Rich text editor for new diary entries
@@ -189,7 +190,7 @@ Smart save button with animated states:
 ## 🔧 Configuration
 
 ### Adding New Fonts
-The app supports Google Fonts and custom fonts:
+The app supports Google Fonts and custom fonts with persistent storage:
 
 ```javascript
 // Google Fonts are automatically loaded
@@ -199,12 +200,19 @@ const GOOGLE_FONTS = [
   // ... more fonts
 ];
 
-// Custom fonts via URL
+// Custom fonts via URL (stored in localStorage)
 const customFont = {
   name: 'Custom Font',
-  url: 'https://fonts.googleapis.com/css2?family=CustomFont'
+  url: 'https://fonts.googleapis.com/css2?family=CustomFont',
+  dateAdded: '2025-06-27T10:00:00.000Z'
 };
 ```
+
+### Font Storage
+- **Persistent Storage**: Custom fonts are saved in browser localStorage
+- **Auto-reload**: Fonts are automatically reloaded on page refresh
+- **Management**: Users can remove custom fonts via dropdown menu
+- **Recent Fonts**: Recently used fonts are tracked and persisted
 
 ### Database Configuration
 Currently uses JSON file storage. Can be easily migrated to:
@@ -243,6 +251,7 @@ Main editor logic is in:
 
 - TypeScript type checking is disabled for build compatibility
 - Some Turbopack compatibility issues (use regular Next.js dev server)
+- Custom fonts are stored in localStorage (cleared when browser data is cleared)
 
 ## 🤝 Contributing
 
