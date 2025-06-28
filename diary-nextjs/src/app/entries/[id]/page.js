@@ -183,9 +183,13 @@ export default function Page() {
   if (!entry) return <div>Entry not found.</div>;
 
   return (
-    <div className="min-h-screen bg-[#f5fafc] flex flex-col">
+    <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Top Bar */}
-      <div className="sticky top-0 z-40 w-full bg-[#e9f3f6] flex flex-col items-center border-b border-gray-200">
+      <div className="sticky top-0 z-40 w-full flex flex-col items-center border-b transition-colors duration-300" 
+           style={{ 
+             backgroundColor: 'var(--bg-secondary)',
+             borderColor: 'var(--border-color)'
+           }}>
         <div className="w-full flex justify-between items-center px-4 py-2 relative h-12 overflow-hidden">
           <SaveButton 
             isDirty={isDirty}
@@ -194,14 +198,15 @@ export default function Page() {
             saveText={id === 'new' ? "Create" : "Save"}
           />
           
-          <span className="text-xs font-semibold tracking-widest ml-50">
+          <span className="text-xs font-semibold tracking-widest ml-50 transition-colors duration-300" 
+                style={{ color: 'var(--text-primary)' }}>
             {new Date(entry.date).toLocaleString("en-US")}
           </span>
           
           <div className="w-8" />
           
           <button
-            className="text-2xl text-red-600 hover:bg-red-100 rounded transition-colors px-2 py-1 mr-2"
+            className="text-2xl text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors px-2 py-1 mr-2"
             onClick={handleDelete}
             title="Delete entry"
           >
@@ -243,19 +248,29 @@ export default function Page() {
       </div>
       
       {/* Editor Area */}
-      <div className="flex-1 bg-white mx-2 my-4 rounded shadow-sm p-4 min-h-[60vh]">
+      <div className="flex-1 mx-2 my-4 rounded shadow-sm p-4 min-h-[60vh] transition-colors duration-300" 
+           style={{ backgroundColor: 'var(--bg-content)' }}>
         <div
           ref={editor.editorRef}
-          className="w-full h-full min-h-[50vh] resize-none outline-none bg-transparent text-base text-black placeholder-gray-400"
+          className="w-full h-full min-h-[50vh] resize-none outline-none bg-transparent text-base placeholder-gray-400 transition-colors duration-300"
           contentEditable
           suppressContentEditableWarning
-          style={{ fontFamily: "inherit", fontSize: 16, whiteSpace: 'pre-wrap' }}
+          style={{ 
+            fontFamily: "inherit", 
+            fontSize: 16, 
+            whiteSpace: 'pre-wrap',
+            color: 'var(--text-primary)'
+          }}
           onInput={editor.handleHtmlChange}
         />
       </div>
       
       {/* Bottom Bar */}
-      <div className="sticky bottom-0 z-30 w-full bg-[#f5fafc] border-t border-gray-200 flex items-center justify-between px-4 py-2">
+      <div className="sticky bottom-0 z-30 w-full border-t flex items-center justify-between px-4 py-2 transition-colors duration-300" 
+           style={{ 
+             backgroundColor: 'var(--bg-primary)',
+             borderColor: 'var(--border-color)'
+           }}>
         <div className="flex gap-3 items-center">
           <button className="text-xl">🖼️</button>
           <button className="text-xl">📍</button>
@@ -263,7 +278,7 @@ export default function Page() {
           <button className="text-xl">🏃</button>
           <button className="text-xl">🏷️</button>
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
           Words {editor.text.trim().split(/\s+/).filter(Boolean).length} · Characters {editor.text.length}
         </div>
       </div>
