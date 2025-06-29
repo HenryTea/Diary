@@ -125,9 +125,14 @@ export default function SocialPage() {
           ...prev,
           [entryId]: ''
         }));
+      } else {
+        const errorData = await res.json();
+        console.error('Comment creation failed:', errorData);
+        alert('Failed to add comment: ' + (errorData.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Comment add error:', error);
+      alert('Failed to add comment. Please try again.');
     }
   };
 

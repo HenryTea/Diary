@@ -35,15 +35,51 @@ export async function GET() {
 export async function POST(request) {
   try {
     const { entryId, action } = await request.json();
-    const authHeader = request.headers.get('authorization');
+    let userId;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return Response.json({ error: 'Authorization required' }, { status: 401 });
+    // Try JWT token first (Authorization header)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.userId;
+      } catch {
+        console.log('JWT verification failed, trying cookie auth');
+      }
     }
     
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.userId;
+    // Fallback to cookie-based authentication
+    if (!userId) {
+      const cookies = request.headers.get('cookie') || '';
+      const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth_session='));
+      
+      if (!authCookie) {
+        return Response.json({ error: 'Authorization required' }, { status: 401 });
+      }
+      
+      try {
+        const cookieValue = authCookie.split('=')[1];
+        const decoded = JSON.parse(decodeURIComponent(cookieValue));
+        
+        // Check if cookie is expired
+        if (decoded.expires && new Date() > new Date(decoded.expires)) {
+          return Response.json({ error: 'Session expired' }, { status: 401 });
+        }
+        
+        userId = decoded.user?.id || decoded.user?.userId;
+        if (!userId) {
+          return Response.json({ error: 'Invalid user session' }, { status: 401 });
+        }
+      } catch (cookieError) {
+        console.log('Cookie decode error:', cookieError);
+        return Response.json({ error: 'Invalid session' }, { status: 401 });
+      }
+    }
+    
+    if (!userId) {
+      return Response.json({ error: 'Authorization required' }, { status: 401 });
+    }
     
     const connection = await mysql.createConnection(process.env.DATABASE_URL);
     
