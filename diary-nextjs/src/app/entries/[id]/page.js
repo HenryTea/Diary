@@ -21,7 +21,28 @@ export default function Page() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
-  const { token, isAuthenticated, loading: authLoading } = useAuth();
+  const { token, isAuthenticated, loading: authLoading, user, requiresAuth } = useAuth();
+  
+  // Immediate redirect check - don't wait for auth loading
+  useEffect(() => {
+    // Check if we have any auth indicators immediately
+    const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
+    const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+    
+    // If no immediate auth indicators and not currently loading, redirect immediately
+    if (!hasToken && !hasUser && !authLoading) {
+      console.log('No authentication found, redirecting to login immediately');
+      router.replace('/login');
+      return;
+    }
+    
+    // Also redirect if auth loading completed and requires auth
+    if (!authLoading && requiresAuth) {
+      console.log('Authentication required, redirecting to login');
+      router.replace('/login');
+      return;
+    }
+  }, [token, user, authLoading, requiresAuth, router]);
   
   // Basic state
   const [entry, setEntry] = useState(id === 'new' ? {
@@ -37,13 +58,6 @@ export default function Page() {
 
   // Rich text editor hook
   const editor = useRichTextEditor(entry, originalHtml, setOriginalHtml, setIsDirty);
-
-  // Redirect if not authenticated (but wait for auth loading to complete)
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -62,13 +76,15 @@ export default function Page() {
         }
 
         // For existing entries, fetch only if we have auth
-        if (!isAuthenticated) {
-          console.log('Not authenticated, redirecting...');
+        if (!isAuthenticated && !token) {
+          console.log('Not authenticated, skipping fetch');
           return;
         }
         
         console.log('Fetching entry with ID:', id);
         setLoading(true);
+        const startTime = performance.now();
+        
         const headers = {
           'Content-Type': 'application/json',
         };
@@ -78,41 +94,37 @@ export default function Page() {
           headers.Authorization = `Bearer ${token}`;
         }
 
-        // Fetch all entries (simpler approach for now)
-        const res = await fetch('/api/entries?page=1&limit=100', { 
+        // Optimized: Fetch specific entry directly instead of all entries
+        const res = await fetch(`/api/entries?id=${encodeURIComponent(id)}`, { 
           headers,
-          credentials: 'include'
+          credentials: 'include',
+          // Add performance optimizations
+          cache: 'no-store', // Ensure fresh data for editing
+          priority: 'high'
         });
         
         if (!res.ok) {
           const errorText = await res.text();
           console.error('API Error:', res.status, errorText);
-          throw new Error(`Failed to fetch entries: ${res.status}`);
+          throw new Error(`Failed to fetch entry: ${res.status}`);
         }
         
         const data = await res.json();
-        console.log('API Response:', data);
+        const fetchTime = performance.now() - startTime;
+        console.log(`API Response received in ${fetchTime.toFixed(2)}ms:`, data);
         
-        // Handle the response - it should have entries array
+        // Handle the response - it should have entries array with single entry
         const entries = data.entries || data;
         console.log('Processing entries:', entries?.length, 'entries found');
         
-        const found = entries.find(e => {
-          const entryId = e.id.toString();
-          const searchId = id.toString();
-          console.log('Comparing:', entryId, '===', searchId, '?', entryId === searchId);
-          return entryId === searchId;
-        });
-        
-        if (!found) {
-          const availableIds = entries.map(e => e.id).join(', ');
-          console.error('Entry not found. Looking for ID:', id, 'Available IDs:', availableIds);
-          console.error('All entries:', entries);
-          setError(`Entry with ID "${id}" not found. ${entries.length > 0 ? `Available entries: ${availableIds}` : 'No entries found in database.'}`);
+        if (!entries || entries.length === 0) {
+          console.error('Entry not found. Looking for ID:', id);
+          setError(`Entry with ID "${id}" not found.`);
           return;
         }
         
-        console.log('Found entry:', found);
+        const found = entries[0]; // Should be the only entry returned
+        console.log(`Found entry in ${fetchTime.toFixed(2)}ms:`, found);
         setEntry(found);
         setOriginalHtml(found.text || '');
       } catch (e) {
@@ -131,6 +143,7 @@ export default function Page() {
 
   const handleSaveAndBack = async () => {
     if (editor.editorRef.current) {
+      const startTime = performance.now();
       const htmlContent = editor.editorRef.current.innerHTML;
       
       const headers = {
@@ -141,40 +154,66 @@ export default function Page() {
         headers.Authorization = `Bearer ${token}`;
       }
       
-      if (id === 'new') {
-        // Create new entry
-        const res = await fetch("/api/entries", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ 
-            text: htmlContent,
-            isRichText: true
-          }),
-        });
-        if (res.ok) {
-          const newEntry = await res.json();
-          setEntry(newEntry);
-          setOriginalHtml(htmlContent);
-          setIsDirty(false);
-          // Update the URL to reflect the new entry ID without navigation
-          window.history.replaceState(null, '', `/entries/${newEntry.id}`);
+      try {
+        if (id === 'new') {
+          // Create new entry
+          console.log('Creating new entry...');
+          const res = await fetch("/api/entries", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ 
+              text: htmlContent,
+            }),
+          });
+          
+          if (res.ok) {
+            const newEntry = await res.json();
+            const saveTime = performance.now() - startTime;
+            console.log(`Entry created in ${saveTime.toFixed(2)}ms:`, newEntry);
+            
+            setEntry(newEntry);
+            setOriginalHtml(htmlContent);
+            setIsDirty(false);
+            // Update the URL to reflect the new entry ID without navigation
+            window.history.replaceState(null, '', `/entries/${newEntry.id}`);
+          } else {
+            const error = await res.text();
+            console.error('Failed to create entry:', error);
+            alert('Failed to save entry: ' + error);
+            return;
+          }
+        } else {
+          // Update existing entry
+          console.log('Updating existing entry:', id);
+          const res = await fetch("/api/entries", {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({ 
+              id, 
+              text: htmlContent,
+              isRichText: true
+            }),
+          });
+          
+          if (res.ok) {
+            const saveTime = performance.now() - startTime;
+            console.log(`Entry updated in ${saveTime.toFixed(2)}ms`);
+            
+            setEntry((prev) => (prev ? { ...prev, text: htmlContent } : prev));
+            setOriginalHtml(htmlContent);
+            setIsDirty(false);
+          } else {
+            const error = await res.text();
+            console.error('Failed to update entry:', error);
+            alert('Failed to save entry: ' + error);
+            return;
+          }
         }
-      } else {
-        // Update existing entry
-        const res = await fetch("/api/entries", {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({ 
-            id, 
-            text: htmlContent,
-            isRichText: true
-          }),
-        });
-        if (res.ok) {
-          setEntry((prev) => (prev ? { ...prev, text: htmlContent } : prev));
-          setOriginalHtml(htmlContent);
-          setIsDirty(false);
-        }
+      } catch (error) {
+        const saveTime = performance.now() - startTime;
+        console.error(`Save failed after ${saveTime.toFixed(2)}ms:`, error);
+        alert('Failed to save entry: ' + error.message);
+        return;
       }
     }
     router.push("/");
@@ -297,7 +336,19 @@ export default function Page() {
   }), [editor, handleFontSizeChange, handleCustomFontSizeChange, handleFontChange, 
        handleBold, handleItalic, handleUnderline, handleColorChange, handleToggleColorPicker]);
 
-  // Show loading screen while auth is loading or user is not authenticated
+  // Show immediate redirect if no auth indicators
+  const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
+  const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+  
+  if (!hasToken && !hasUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>
+      </div>
+    );
+  }
+
+  // Show loading screen while auth is loading
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -306,7 +357,8 @@ export default function Page() {
     );
   }
 
-  if (!isAuthenticated) {
+  // Show redirect if auth check completed and requires auth
+  if (requiresAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>

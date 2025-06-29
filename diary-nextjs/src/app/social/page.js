@@ -14,15 +14,29 @@ export default function SocialPage() {
   const [commentDialogs, setCommentDialogs] = useState({});
   const [comments, setComments] = useState({});
   const [newComment, setNewComment] = useState({});
-  const { token, isAuthenticated, loading: authLoading, requiresAuth } = useAuth();
+  const { token, isAuthenticated, loading: authLoading, requiresAuth, user } = useAuth();
   const router = useRouter();
 
+  // Immediate redirect check - don't wait for auth loading
   useEffect(() => {
-    // Redirect to login if authentication is required
-    if (!authLoading && requiresAuth) {
+    // Check if we have any auth indicators immediately
+    const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
+    const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+    
+    // If no immediate auth indicators and not currently loading, redirect immediately
+    if (!hasToken && !hasUser && !authLoading) {
+      console.log('No authentication found, redirecting to login immediately');
       router.replace('/login');
+      return;
     }
-  }, [requiresAuth, authLoading, router]);
+    
+    // Also redirect if auth loading completed and requires auth
+    if (!authLoading && requiresAuth) {
+      console.log('Authentication required, redirecting to login');
+      router.replace('/login');
+      return;
+    }
+  }, [token, user, authLoading, requiresAuth, router]);
 
   const fetchSocialEntries = async (useCache = true) => {
     setLoading(true);
@@ -173,6 +187,18 @@ export default function SocialPage() {
       router.replace('/login');
     }
   }, [requiresAuth, authLoading, router]);
+
+  // Show immediate redirect if no auth indicators
+  const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
+  const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+  
+  if (!hasToken && !hasUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>
+      </div>
+    );
+  }
 
   // Show loading screen only while checking authentication
   if (authLoading || requiresAuth) {

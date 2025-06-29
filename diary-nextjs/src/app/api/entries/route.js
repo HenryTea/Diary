@@ -5,6 +5,8 @@ import { verifyToken } from '@/utils/auth';
 export const runtime = 'nodejs';
 
 export async function GET(request) {
+  const startTime = Date.now();
+  
   try {
     console.log('Starting entries GET request...');
     
@@ -12,16 +14,11 @@ export async function GET(request) {
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
     const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit') || '50')));
     const offset = (page - 1) * limit;
-    const specificId = url.searchParams.get('id'); // New: support fetching specific entry
+    const specificId = url.searchParams.get('id');
     
     console.log('Request params:', { page, limit, offset, specificId });
     
-    // Test database connection first
-    console.log('Testing database connection...');
-    await pool.execute('SELECT 1');
-    console.log('Database connection successful');
-    
-    // Get user authentication
+    // Get user authentication (no DB call needed here)
     console.log('Checking authentication...');
     const user = verifyToken(request);
     console.log('User auth result:', user);
@@ -33,53 +30,63 @@ export async function GET(request) {
       console.log('Using authenticated user query for userId:', user.userId);
       
       if (specificId) {
-        // Fetch specific entry
+        // Optimized: Use index on user_id and id
         query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? AND id = ? LIMIT 1`;
         params = [user.userId, specificId];
       } else {
-        // Fetch paginated entries
-        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
-        params = [user.userId];
+        // Optimized: Use prepared statement with static limit/offset
+        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ? OFFSET ?`;
+        params = [user.userId, limit, offset];
       }
     } else {
-      // For backward compatibility, get all entries if no user
       console.log('Using public query (no authentication)');
       
       if (specificId) {
         query = `SELECT id, date, content as text, is_shared FROM entries WHERE id = ? LIMIT 1`;
         params = [specificId];
       } else {
-        query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
-        params = [];
+        query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ? OFFSET ?`;
+        params = [limit, offset];
       }
     }
     
     console.log('Executing query:', query);
     console.log('With params:', params);
     
+    // Single optimized database call
     const [rows] = await pool.execute(query, params);
-    console.log('Query successful, got', rows.length, 'rows');
     
-    // Add caching headers for better performance
+    const dbTime = Date.now() - startTime;
+    console.log(`Query successful, got ${rows.length} rows in ${dbTime}ms`);
+    
+    // Optimized response with aggressive caching
     const response = NextResponse.json({
       entries: rows,
       pagination: specificId ? null : {
         page,
         limit,
         hasMore: rows.length === limit
+      },
+      _debug: {
+        dbTime: `${dbTime}ms`,
+        totalTime: `${Date.now() - startTime}ms`
       }
     });
     
-    response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
-    response.headers.set('CDN-Cache-Control', 'public, s-maxage=30');
+    // Aggressive caching for Railway-Vercel optimization
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    response.headers.set('CDN-Cache-Control', 'public, s-maxage=60');
+    response.headers.set('Vercel-CDN-Cache-Control', 'public, s-maxage=60');
     
     return response;
   } catch (error) {
-    console.error('GET /api/entries error:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`GET /api/entries error after ${totalTime}ms:`, error);
     console.error('Error stack:', error.stack);
     return NextResponse.json({ 
       error: 'Failed to read entries.',
       details: error.message,
+      _debug: { totalTime: `${totalTime}ms` },
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 });
   }
@@ -113,6 +120,8 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
+  const startTime = Date.now();
+  
   try {
     const user = verifyToken(request);
     if (!user) {
@@ -122,48 +131,72 @@ export async function PUT(request) {
     const body = await request.json();
     const { id, text, is_shared } = body;
     
-    console.log('PUT request body:', { id, text, is_shared, userId: user.userId });
+    console.log('PUT request body:', { id, text: text?.length, is_shared, userId: user.userId });
     
-    // Build update query based on provided fields
-    if (text !== undefined) {
-      // Update entry text
-      await pool.execute(
-        'UPDATE entries SET content = ? WHERE id = ? AND user_id = ?', 
-        [text, id, user.userId]
-      );
-    }
+    // Optimize: Use a single transaction for multiple updates
+    const connection = await pool.getConnection();
     
-    if (is_shared !== undefined) {
-      try {
-        // Update sharing status
-        await pool.execute(
-          'UPDATE entries SET is_shared = ? WHERE id = ? AND user_id = ?',
-          [is_shared, id, user.userId]
+    try {
+      await connection.beginTransaction();
+      
+      // Build and execute updates efficiently
+      if (text !== undefined && is_shared !== undefined) {
+        // Single query for both updates
+        await connection.execute(
+          'UPDATE entries SET content = ?, is_shared = ? WHERE id = ? AND user_id = ?', 
+          [text, is_shared, id, user.userId]
         );
-        console.log('Successfully updated is_shared for entry:', id);
-      } catch (columnError) {
-        console.log('is_shared column might not exist, adding it...', columnError.message);
-        // Try to add the column if it doesn't exist
+      } else if (text !== undefined) {
+        // Update entry text only
+        await connection.execute(
+          'UPDATE entries SET content = ? WHERE id = ? AND user_id = ?', 
+          [text, id, user.userId]
+        );
+      } else if (is_shared !== undefined) {
+        // Update sharing status only
         try {
-          await pool.execute('ALTER TABLE entries ADD COLUMN is_shared BOOLEAN DEFAULT FALSE');
-          console.log('Added is_shared column, retrying update...');
-          // Retry the update
-          await pool.execute(
+          await connection.execute(
             'UPDATE entries SET is_shared = ? WHERE id = ? AND user_id = ?',
             [is_shared, id, user.userId]
           );
-          console.log('Successfully updated is_shared after adding column');
-        } catch (alterError) {
-          console.error('Failed to add is_shared column:', alterError);
-          return NextResponse.json({ error: 'Database schema error: ' + alterError.message }, { status: 500 });
+        } catch (columnError) {
+          if (columnError.code === 'ER_BAD_FIELD_ERROR') {
+            console.log('is_shared column missing, adding it...');
+            await connection.execute('ALTER TABLE entries ADD COLUMN is_shared BOOLEAN DEFAULT FALSE');
+            await connection.execute(
+              'UPDATE entries SET is_shared = ? WHERE id = ? AND user_id = ?',
+              [is_shared, id, user.userId]
+            );
+          } else {
+            throw columnError;
+          }
         }
       }
+      
+      await connection.commit();
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`PUT completed successfully in ${totalTime}ms`);
+      
+      return NextResponse.json({ 
+        success: true, 
+        _debug: { totalTime: `${totalTime}ms` }
+      });
+      
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
     
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('PUT /api/entries error:', error);
-    return NextResponse.json({ error: 'Failed to update entry: ' + error.message }, { status: 500 });
+    const totalTime = Date.now() - startTime;
+    console.error(`PUT /api/entries error after ${totalTime}ms:`, error);
+    return NextResponse.json({ 
+      error: 'Failed to update entry: ' + error.message,
+      _debug: { totalTime: `${totalTime}ms` }
+    }, { status: 500 });
   }
 }
 
