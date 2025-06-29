@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import pool from '../../../utils/db';
+import pool from '@/utils/db';
 
 export async function GET(request) {
   try {

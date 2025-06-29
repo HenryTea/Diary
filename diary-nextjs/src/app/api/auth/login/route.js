@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import pool from '../../../utils/db';
+import pool from '@/utils/db';
 
 export async function POST(request) {
   try {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../utils/db';
-import { verifyToken } from '../../../utils/auth';
+import pool from '@/utils/db';
+import { verifyToken } from '@/utils/auth';
 
 export const runtime = 'nodejs';
 

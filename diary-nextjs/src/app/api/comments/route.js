@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import pool from '../../../utils/db';
+import pool from '@/utils/db';
 
 // Helper function to get user ID from request
 async function getUserFromRequest(request) {
