@@ -13,15 +13,15 @@ export default function SocialPage() {
   const [commentDialogs, setCommentDialogs] = useState({});
   const [comments, setComments] = useState({});
   const [newComment, setNewComment] = useState({});
-  const { token, isAuthenticated, loading: authLoading } = useAuth();
+  const { token, isAuthenticated, loading: authLoading, requiresAuth } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!authLoading && !isAuthenticated) {
+    // Redirect to login if authentication is required
+    if (!authLoading && requiresAuth) {
       router.replace('/login');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [requiresAuth, authLoading, router]);
 
   const fetchSocialEntries = async () => {
     setLoading(true);
@@ -137,12 +137,12 @@ export default function SocialPage() {
     }
   }, [isAuthenticated, token]);
 
-  // Show loading screen while checking authentication or if not authenticated
-  if (authLoading || !isAuthenticated) {
+  // Show loading screen while checking authentication or if authentication required
+  if (authLoading || requiresAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ color: 'var(--text-primary)' }}>
-          {authLoading ? 'Loading...' : 'Redirecting to login...'}
+          {authLoading ? 'Checking access...' : 'Redirecting to login...'}
         </div>
       </div>
     );
