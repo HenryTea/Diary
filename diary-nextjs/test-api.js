@@ -1,5 +1,5 @@
 // Quick test script to verify API endpoints
-const http = require('http');
+import http from 'http';
 
 async function testAPI() {
   try {

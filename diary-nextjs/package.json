@@ -2,16 +2,20 @@
   "name": "diary-nextjs",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:api": "node test-api-safe.js",
+    "test:security": "node test-security.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.0.0",
     "htmldiff-js": "^1.0.5",
+    "isomorphic-dompurify": "^2.25.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.1",
     "next": "15.3.3",

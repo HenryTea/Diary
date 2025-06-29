@@ -1,5 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { secureStorage } from '../utils/security';
 
 const AuthContext = createContext();
 
@@ -23,10 +24,8 @@ export function AuthProvider({ children }) {
         // Clear any existing auth data for expired/invalid cookies
         setUser(null);
         setToken(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-        }
+        secureStorage.removeUser();
+        secureStorage.removeToken();
         setLoading(false);
         return;
       }
@@ -37,18 +36,16 @@ export function AuthProvider({ children }) {
         setToken(authData.user.token || null);
         setIpCheckRequired(false);
       } else {
-        // Fall back to localStorage if cookie doesn't have full user data
-        if (typeof window !== 'undefined') {
-          const storedUser = localStorage.getItem('user');
-          const storedToken = localStorage.getItem('token');
-          
-          if (storedUser && storedToken) {
-            setUser(JSON.parse(storedUser));
-            setToken(storedToken);
-            setIpCheckRequired(false);
-          } else {
-            setIpCheckRequired(true);
-          }
+        // Fall back to secure storage if cookie doesn't have full user data
+        const storedUser = secureStorage.getUser();
+        const storedToken = secureStorage.getToken();
+        
+        if (storedUser && storedToken) {
+          setUser(storedUser);
+          setToken(storedToken);
+          setIpCheckRequired(false);
+        } else {
+          setIpCheckRequired(true);
         }
       }
       
@@ -72,10 +69,9 @@ export function AuthProvider({ children }) {
     setIpCheckRequired(false);
     
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', authToken);
-      }
+      // Use secure storage instead of localStorage
+      secureStorage.setUser(userData);
+      secureStorage.setToken(authToken);
       
       // Set authentication cookie
       await fetch('/api/auth-check', {
@@ -97,10 +93,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     setToken(null);
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
+      // Clear secure storage
+      secureStorage.removeUser();
+      secureStorage.removeToken();
       
       // Clear authentication cookie
       await fetch('/api/auth-check', {

@@ -16,6 +16,15 @@ import {
   checkFormatting,
   loadGoogleFont
 } from "../../../utils/editorUtils";
+import { 
+  sanitizeHtml, 
+  sanitizeInput, 
+  validateEntryId, 
+  validateHtmlContent, 
+  RateLimiter,
+  secureStorage,
+  escapeHtml
+} from "../../../utils/security";
 
 export default function Page() {
   const router = useRouter();
@@ -24,6 +33,18 @@ export default function Page() {
   const { token, isAuthenticated, loading: authLoading, user, requiresAuth } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  
+  // Security: Rate limiter for save operations
+  const [saveLimiter] = useState(() => new RateLimiter(10, 60000)); // 10 saves per minute
+  
+  // Security: Validate entry ID on mount
+  useEffect(() => {
+    if (id && id !== 'new' && !validateEntryId(id)) {
+      console.error('Invalid entry ID detected:', id);
+      router.replace('/');
+      return;
+    }
+  }, [id, router]);
   
   // Ensure component is mounted before checking client-side auth
   useEffect(() => {
@@ -34,9 +55,9 @@ export default function Page() {
   useEffect(() => {
     if (!mounted) return;
     
-    // Check if we have any auth indicators immediately
-    const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
-    const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+    // Security: Use secure storage instead of direct localStorage access
+    const hasToken = token || secureStorage.getToken();
+    const hasUser = user || secureStorage.getUser();
     
     // If no immediate auth indicators and not currently loading, redirect immediately
     if (!hasToken && !hasUser && !authLoading) {
@@ -129,15 +150,21 @@ export default function Page() {
         console.log('Processing entries:', entries?.length, 'entries found');
         
         if (!entries || entries.length === 0) {
-          console.error('Entry not found. Looking for ID:', id);
-          setError(`Entry with ID "${id}" not found.`);
+          console.error('Entry not found. Looking for ID:', sanitizeInput(id));
+          setError(`Entry with ID "${escapeHtml(id)}" not found.`);
           return;
         }
         
         const found = entries[0]; // Should be the only entry returned
         console.log(`Found entry in ${fetchTime.toFixed(2)}ms:`, found);
-        setEntry(found);
-        setOriginalHtml(found.text || '');
+        
+        // Security: Sanitize HTML content from server
+        const sanitizedEntry = {
+          ...found,
+          text: sanitizeHtml(found.text || '')
+        };
+        setEntry(sanitizedEntry);
+        setOriginalHtml(sanitizedEntry.text);
       } catch (e) {
         console.error('Fetch error:', e);
         setError(e instanceof Error ? e.message : String(e));
@@ -153,9 +180,30 @@ export default function Page() {
   }, [id, token, isAuthenticated, authLoading]);
 
   const handleSaveAndBack = async () => {
+    // Security: Rate limiting check
+    const userId = user?.id || 'anonymous';
+    if (!saveLimiter.isAllowed(userId)) {
+      alert('Too many save attempts. Please wait before trying again.');
+      return;
+    }
+    
+    // Security: Validate entry ID
+    if (!validateEntryId(id)) {
+      alert('Invalid entry ID');
+      return;
+    }
+    
     if (editor.editorRef.current) {
       const startTime = performance.now();
-      const htmlContent = editor.editorRef.current.innerHTML;
+      const rawHtml = editor.editorRef.current.innerHTML;
+      
+      // Security: Validate and sanitize HTML content
+      if (!validateHtmlContent(rawHtml)) {
+        alert('Invalid content detected. Please check your entry.');
+        return;
+      }
+      
+      const sanitizedHtml = sanitizeHtml(rawHtml);
       
       const headers = {
         'Content-Type': 'application/json',
@@ -173,8 +221,9 @@ export default function Page() {
             method: "POST",
             headers,
             body: JSON.stringify({ 
-              text: htmlContent,
+              text: sanitizedHtml, // Use sanitized HTML
             }),
+            credentials: 'include'
           });
           
           if (res.ok) {
@@ -182,15 +231,23 @@ export default function Page() {
             const saveTime = performance.now() - startTime;
             console.log(`Entry created in ${saveTime.toFixed(2)}ms:`, newEntry);
             
-            setEntry(newEntry);
-            setOriginalHtml(htmlContent);
+            // Security: Sanitize response data
+            const sanitizedNewEntry = {
+              ...newEntry,
+              text: sanitizeHtml(newEntry.text || '')
+            };
+            
+            setEntry(sanitizedNewEntry);
+            setOriginalHtml(sanitizedHtml);
             setIsDirty(false);
             // Update the URL to reflect the new entry ID without navigation
-            window.history.replaceState(null, '', `/entries/${newEntry.id}`);
+            if (validateEntryId(newEntry.id)) {
+              window.history.replaceState(null, '', `/entries/${newEntry.id}`);
+            }
           } else {
             const error = await res.text();
             console.error('Failed to create entry:', error);
-            alert('Failed to save entry: ' + error);
+            alert('Failed to save entry: ' + sanitizeInput(error));
             return;
           }
         } else {
@@ -200,30 +257,31 @@ export default function Page() {
             method: "PUT",
             headers,
             body: JSON.stringify({ 
-              id, 
-              text: htmlContent,
+              id: sanitizeInput(id), 
+              text: sanitizedHtml,
               isRichText: true
             }),
+            credentials: 'include'
           });
           
           if (res.ok) {
             const saveTime = performance.now() - startTime;
             console.log(`Entry updated in ${saveTime.toFixed(2)}ms`);
             
-            setEntry((prev) => (prev ? { ...prev, text: htmlContent } : prev));
-            setOriginalHtml(htmlContent);
+            setEntry((prev) => (prev ? { ...prev, text: sanitizedHtml } : prev));
+            setOriginalHtml(sanitizedHtml);
             setIsDirty(false);
           } else {
             const error = await res.text();
             console.error('Failed to update entry:', error);
-            alert('Failed to save entry: ' + error);
+            alert('Failed to save entry: ' + sanitizeInput(error));
             return;
           }
         }
       } catch (error) {
         const saveTime = performance.now() - startTime;
         console.error(`Save failed after ${saveTime.toFixed(2)}ms:`, error);
-        alert('Failed to save entry: ' + error.message);
+        alert('Failed to save entry: ' + sanitizeInput(error.message || String(error)));
         return;
       }
     }
@@ -231,6 +289,12 @@ export default function Page() {
   };
 
   const handleDelete = async () => {
+    // Security: Validate entry ID
+    if (!validateEntryId(id)) {
+      alert('Invalid entry ID');
+      return;
+    }
+    
     if (id === 'new') {
       // Can't delete a new entry that hasn't been saved yet
       if (window.confirm("Discard this new entry?")) {
@@ -248,12 +312,18 @@ export default function Page() {
         headers.Authorization = `Bearer ${token}`;
       }
       
-      await fetch("/api/entries", {
-        method: "DELETE",
-        headers,
-        body: JSON.stringify({ id }),
-      });
-      router.push("/");
+      try {
+        await fetch("/api/entries", {
+          method: "DELETE",
+          headers,
+          body: JSON.stringify({ id: sanitizeInput(id) }),
+          credentials: 'include'
+        });
+        router.push("/");
+      } catch (error) {
+        console.error('Delete failed:', error);
+        alert('Failed to delete entry: ' + sanitizeInput(error.message || String(error)));
+      }
     }
   };
 
@@ -359,8 +429,8 @@ export default function Page() {
   }
 
   // After mounting, check if we still need to redirect (additional safety check)
-  const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
-  const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
+  const hasToken = token || secureStorage.getToken();
+  const hasUser = user || secureStorage.getUser();
   
   if (!hasToken && !hasUser) {
     // This should rarely be hit due to the useEffect above, but provides safety
@@ -444,7 +514,7 @@ export default function Page() {
         <FormattingToolbar {...toolbarProps} />
       </div>
       
-      {/* Editor Area */}
+      {/* Editor Area - Secured */}
       <div className="flex-1 mx-2 my-4 rounded shadow-sm p-4 min-h-[60vh] transition-colors duration-300" 
            style={{ backgroundColor: 'var(--bg-content)' }}>
         <div
@@ -458,7 +528,58 @@ export default function Page() {
             whiteSpace: 'pre-wrap',
             color: 'var(--text-primary)'
           }}
-          onInput={editor.handleHtmlChange}
+          onInput={(e) => {
+            // Security: Sanitize input in real-time
+            const content = e.target.innerHTML;
+            const sanitized = sanitizeHtml(content);
+            
+            // Only update if content changed to prevent infinite loops
+            if (sanitized !== content) {
+              e.target.innerHTML = sanitized;
+              // Set cursor to end
+              const range = document.createRange();
+              const sel = window.getSelection();
+              range.selectNodeContents(e.target);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+            
+            editor.handleHtmlChange(e);
+          }}
+          onPaste={(e) => {
+            // Security: Sanitize pasted content
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            const sanitizedText = sanitizeInput(text);
+            
+            // Insert sanitized text
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(document.createTextNode(sanitizedText));
+              range.collapse(false);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+            
+            // Trigger change event
+            editor.handleHtmlChange({ target: e.target });
+          }}
+          onKeyDown={(e) => {
+            // Security: Block dangerous key combinations
+            if (e.ctrlKey || e.metaKey) {
+              // Allow common editing shortcuts but block potentially dangerous ones
+              const allowedKeys = ['a', 'c', 'v', 'x', 'z', 'y', 'b', 'i', 'u'];
+              if (!allowedKeys.includes(e.key.toLowerCase())) {
+                // Allow arrow keys, delete, backspace, etc.
+                if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Delete', 'Backspace', 'Enter', 'Tab'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }
+            }
+          }}
         />
       </div>
       
