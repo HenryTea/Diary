@@ -12,11 +12,11 @@ export async function GET(request) {
     
     if (user) {
       // Get entries for authenticated user
-      query = 'SELECT id, date, content as text FROM entries WHERE user_id = ? ORDER BY date DESC';
+      query = 'SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC';
       params = [user.userId];
     } else {
       // For backward compatibility, get all entries if no user (temporary)
-      query = 'SELECT id, date, content as text FROM entries ORDER BY date DESC';
+      query = 'SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC';
       params = [];
     }
     
@@ -63,18 +63,50 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
-    const { id, text } = body;
+    const { id, text, is_shared } = body;
     
-    // Update only entries belonging to the user
-    await pool.query(
-      'UPDATE entries SET content = ? WHERE id = ? AND user_id = ?', 
-      [text, id, user.userId]
-    );
+    console.log('PUT request body:', { id, text, is_shared, userId: user.userId });
+    
+    // Build update query based on provided fields
+    if (text !== undefined) {
+      // Update entry text
+      await pool.query(
+        'UPDATE entries SET content = ? WHERE id = ? AND user_id = ?', 
+        [text, id, user.userId]
+      );
+    }
+    
+    if (is_shared !== undefined) {
+      try {
+        // Update sharing status
+        await pool.query(
+          'UPDATE entries SET is_shared = ? WHERE id = ? AND user_id = ?',
+          [is_shared, id, user.userId]
+        );
+        console.log('Successfully updated is_shared for entry:', id);
+      } catch (columnError) {
+        console.log('is_shared column might not exist, adding it...', columnError.message);
+        // Try to add the column if it doesn't exist
+        try {
+          await pool.query('ALTER TABLE entries ADD COLUMN is_shared BOOLEAN DEFAULT FALSE');
+          console.log('Added is_shared column, retrying update...');
+          // Retry the update
+          await pool.query(
+            'UPDATE entries SET is_shared = ? WHERE id = ? AND user_id = ?',
+            [is_shared, id, user.userId]
+          );
+          console.log('Successfully updated is_shared after adding column');
+        } catch (alterError) {
+          console.error('Failed to add is_shared column:', alterError);
+          return NextResponse.json({ error: 'Database schema error: ' + alterError.message }, { status: 500 });
+        }
+      }
+    }
     
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('PUT /api/entries error:', error);
-    return NextResponse.json({ error: 'Failed to update entry.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update entry: ' + error.message }, { status: 500 });
   }
 }
 

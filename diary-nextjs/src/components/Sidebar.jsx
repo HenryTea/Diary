@@ -1,24 +1,30 @@
 'use client';
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsDialog from './SettingsDialog';
-
-const menuItems = [
-  { name: 'Home', icon: '/home.svg', active: true },
-  { name: 'Media', icon: '/media.svg', active: false },
-  { name: 'Setting', icon: '/setting.svg', active: false },
-];
 
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { logout, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const menuItems = [
+    { name: 'Home', icon: '/home.svg', path: '/', marginTop: 'mt-7' },
+    { name: 'Social', icon: '/icon/social.svg', path: '/social', marginTop: 'mt-1' },
+    { name: 'Media', icon: '/media.svg', path: '/media', marginTop: 'mt-1' },
+    { name: 'Setting', icon: '/setting.svg', path: '/settings', marginTop: 'mt-1' },
+  ];
 
   const handleMenuClick = (itemName) => {
     if (itemName === 'Setting') {
       setShowSettings(true);
+    } else if (itemName === 'Home') {
+      router.push('/');
+    } else if (itemName === 'Social') {
+      router.push('/social');
     }
   };
 
@@ -39,7 +45,9 @@ export default function Sidebar() {
         onMouseLeave={() => setExpanded(false)}
       >
         <nav className="flex flex-col items-center py-8 gap-2 h-full">
-          {menuItems.map((item) => (
+          {menuItems.map((item) => {
+            const isActive = pathname === item.path;
+            return (
             <a
               key={item.name}
               href="#"
@@ -47,18 +55,18 @@ export default function Sidebar() {
                 e.preventDefault();
                 handleMenuClick(item.name);
               }}
-              className={`relative flex items-center w-full px-2 py-3 my-1 rounded-lg transition-colors group mx-auto
-                ${item.active ? 'border-l-4 border-gray-400 dark:border-gray-300 mx-auto mt-7' : 'hover:border-l-4 hover:border-gray-400 dark:hover:border-gray-300 border-l-4 border-transparent'}`}
+              className={`relative flex items-center w-full px-2 py-3 my-1 rounded-lg transition-colors group mx-auto ${item.marginTop}
+                ${isActive ? 'border-l-4 border-gray-400 dark:border-gray-300' : 'hover:border-l-4 hover:border-gray-400 dark:hover:border-gray-300 border-l-4 border-transparent'}`}
               style={{
-                backgroundColor: item.active ? 'var(--sidebar-hover)' : 'transparent'
+                backgroundColor: isActive ? 'var(--sidebar-hover)' : 'transparent'
               }}
               onMouseEnter={(e) => {
-                if (!item.active) {
+                if (!isActive) {
                   e.target.style.backgroundColor = 'var(--sidebar-hover)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!item.active) {
+                if (!isActive) {
                   e.target.style.backgroundColor = 'transparent';
                 }
               }}
@@ -81,7 +89,8 @@ export default function Sidebar() {
                 {item.name}
               </span>
             </a>
-          ))}
+            );
+          })}
           
           {/* Spacer to push bottom items to the bottom */}
           <div className="flex-1"></div>
@@ -133,7 +142,7 @@ export default function Sidebar() {
             title="Logout"
           >
             <span className="flex items-center justify-center w-10">
-              <img src="/logout.svg" alt="Logout" className="w-7 h-7 mr-1.5" />
+              <img src="/logout.svg" alt="Logout" className="w-7 h-7" />
             </span>
             <span
               className={`overflow-hidden transition-all duration-300 ml-0 ${expanded ? 'opacity-100 w-32 ml-4' : 'opacity-0 w-0'}`}

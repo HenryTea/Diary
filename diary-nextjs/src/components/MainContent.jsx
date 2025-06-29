@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { stripHtmlTags } from '../utils/editorUtils';
 import { useAuth } from '../contexts/AuthContext';
+import ShareDialog from './ShareDialog';
 
 export default function MainContent() {
   const [sortAsc, setSortAsc] = useState(true);
@@ -13,6 +14,8 @@ export default function MainContent() {
   const [searchType, setSearchType] = useState('text'); // 'text' or 'date'
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState(null);
   const searchInputRef = useRef(null);
   const { token } = useAuth();
 
@@ -174,6 +177,22 @@ export default function MainContent() {
     }
   };
 
+  const handleShare = (entry, e) => {
+    e.stopPropagation();
+    setSelectedEntry(entry);
+    setShowShareDialog(true);
+  };
+
+  const handleCloseShareDialog = () => {
+    setShowShareDialog(false);
+    setSelectedEntry(null);
+  };
+
+  const handleSaveSharing = () => {
+    // Refresh entries after sharing settings change
+    fetchEntries();
+  };
+
   return (
     <main className="pt-24 px-8 mx-auto min-h-screen transition-colors duration-300" 
           style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
@@ -295,6 +314,13 @@ export default function MainContent() {
                 >
                   🗑️
                 </button>
+                <button
+                  className="absolute top-2 right-12 hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 z-10 transition-colors"
+                  title="Share entry"
+                  onClick={e => handleShare(entry, e)}
+                >
+                  <img src="/icon/share.svg" alt="Share" className="w-5 h-5" />
+                </button>
                 <div className="font-bold mb-1 transition-colors duration-300" style={{ color: '#72b3c8' }}>
                   {new Date(entry.date).toLocaleString('en-US', {
                     year: 'numeric', month: 'long', day: 'numeric',
@@ -328,6 +354,14 @@ export default function MainContent() {
           )}
         </div>
       </div>
+      
+      {/* Share Dialog */}
+      <ShareDialog
+        isOpen={showShareDialog}
+        onClose={handleCloseShareDialog}
+        entry={selectedEntry}
+        onSave={handleSaveSharing}
+      />
     </main>
   );
 }
