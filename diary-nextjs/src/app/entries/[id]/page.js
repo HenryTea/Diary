@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
 import FormattingToolbar from "../../../components/editor/FormattingToolbar";
@@ -24,8 +24,13 @@ export default function Page() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   
   // Basic state
-  const [entry, setEntry] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [entry, setEntry] = useState(id === 'new' ? {
+    id: 'new',
+    text: '',
+    date: new Date().toISOString(),
+    isRichText: true
+  } : null);
+  const [loading, setLoading] = useState(id !== 'new'); // Don't show loading for new entries
   const [error, setError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [originalHtml, setOriginalHtml] = useState("");
@@ -42,9 +47,8 @@ export default function Page() {
 
   useEffect(() => {
     const fetchEntry = async () => {
-      setLoading(true);
       try {
-        // Handle new entry case
+        // Handle new entry case - immediate setup, no API call needed
         if (id === 'new') {
           setEntry({
             id: 'new',
@@ -57,28 +61,70 @@ export default function Page() {
           return;
         }
 
+        // For existing entries, fetch only if we have auth
+        if (!isAuthenticated) {
+          console.log('Not authenticated, redirecting...');
+          return;
+        }
+        
+        console.log('Fetching entry with ID:', id);
+        setLoading(true);
         const headers = {
           'Content-Type': 'application/json',
         };
         
+        // Add token if available
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
 
-        const res = await fetch("/api/entries", { headers });
-        if (!res.ok) throw new Error('Failed to fetch entries');
+        // Fetch all entries (simpler approach for now)
+        const res = await fetch('/api/entries?page=1&limit=100', { 
+          headers,
+          credentials: 'include'
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('API Error:', res.status, errorText);
+          throw new Error(`Failed to fetch entries: ${res.status}`);
+        }
+        
         const data = await res.json();
-        const found = data.find((e) => e.id.toString() === id);
-        if (!found) throw new Error("Entry not found");
+        console.log('API Response:', data);
+        
+        // Handle the response - it should have entries array
+        const entries = data.entries || data;
+        console.log('Processing entries:', entries?.length, 'entries found');
+        
+        const found = entries.find(e => {
+          const entryId = e.id.toString();
+          const searchId = id.toString();
+          console.log('Comparing:', entryId, '===', searchId, '?', entryId === searchId);
+          return entryId === searchId;
+        });
+        
+        if (!found) {
+          const availableIds = entries.map(e => e.id).join(', ');
+          console.error('Entry not found. Looking for ID:', id, 'Available IDs:', availableIds);
+          console.error('All entries:', entries);
+          setError(`Entry with ID "${id}" not found. ${entries.length > 0 ? `Available entries: ${availableIds}` : 'No entries found in database.'}`);
+          return;
+        }
+        
+        console.log('Found entry:', found);
         setEntry(found);
+        setOriginalHtml(found.text || '');
       } catch (e) {
+        console.error('Fetch error:', e);
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
     };
     
-    if (isAuthenticated && token && !authLoading) {
+    // Only fetch when we have proper auth state
+    if (!authLoading) {
       fetchEntry();
     }
   }, [id, token, isAuthenticated, authLoading]);
@@ -161,8 +207,8 @@ export default function Page() {
     }
   };
 
-  // Formatting handlers
-  const handleFontSizeChange = (value) => {
+  // Formatting handlers - MEMOIZED for better performance
+  const handleFontSizeChange = useCallback((value) => {
     if (value === 'custom') {
       editor.setShowCustomInput(true);
     } else {
@@ -170,14 +216,14 @@ export default function Page() {
       editor.setFontSizeSelected(Number(value));
       applyFontSize(Number(value), editor.editorRef, editor.handleHtmlChange);
     }
-  };
+  }, [editor]);
 
-  const handleCustomFontSizeChange = (size) => {
+  const handleCustomFontSizeChange = useCallback((size) => {
     editor.setCustomFontSize(size);
     applyFontSize(size, editor.editorRef, editor.handleHtmlChange);
-  };
+  }, [editor]);
 
-  const handleFontChange = (fontFamily) => {
+  const handleFontChange = useCallback((fontFamily) => {
     if (fontFamily === 'add-new-font') {
       editor.setShowFontDialog(true);
       return;
@@ -193,42 +239,117 @@ export default function Page() {
         return [fontFamily, ...filtered].slice(0, 2);
       });
     }
-  };
+  }, [editor]);
 
-  const handleBold = () => {
+  const handleBold = useCallback(() => {
     applyBold(editor.editorRef, checkFormatting, editor.handleHtmlChange);
-  };
+  }, [editor]);
 
-  const handleItalic = () => {
+  const handleItalic = useCallback(() => {
     applyItalic(editor.editorRef, checkFormatting, editor.handleHtmlChange);
-  };
+  }, [editor]);
 
-  const handleUnderline = () => {
+  const handleUnderline = useCallback(() => {
     applyUnderline(editor.editorRef, checkFormatting, editor.handleHtmlChange);
-  };
+  }, [editor]);
 
-  const handleColorChange = (color) => {
+  const handleColorChange = useCallback((color) => {
     applyTextColor(color, editor.editorRef, editor.handleHtmlChange);
     editor.setSelectedColor(color);
     editor.setShowColorPicker(false);
-  };
+  }, [editor]);
 
-  const handleToggleColorPicker = () => {
+  const handleToggleColorPicker = useCallback(() => {
     editor.setShowColorPicker(!editor.showColorPicker);
-  };
+  }, [editor]);
+
+  // Memoize toolbar props to prevent unnecessary re-renders
+  const toolbarProps = useMemo(() => ({
+    // Font props
+    selectedFont: editor.selectedFont,
+    onFontChange: handleFontChange,
+    GOOGLE_FONTS: editor.GOOGLE_FONTS,
+    customFonts: editor.customFonts,
+    recentlyUsedFonts: editor.recentlyUsedFonts,
+    onShowFontDialog: () => editor.setShowFontDialog(true),
+    
+    // Font size props
+    fontSizeSelected: editor.fontSizeSelected,
+    showCustomInput: editor.showCustomInput,
+    customFontSize: editor.customFontSize,
+    FONT_SIZES: editor.FONT_SIZES,
+    onFontSizeChange: handleFontSizeChange,
+    onCustomFontSizeChange: handleCustomFontSizeChange,
+    
+    // Formatting props
+    isBold: editor.isBold,
+    isItalic: editor.isItalic,
+    isUnderline: editor.isUnderline,
+    onBold: handleBold,
+    onItalic: handleItalic,
+    onUnderline: handleUnderline,
+    
+    // Color props
+    selectedColor: editor.selectedColor,
+    showColorPicker: editor.showColorPicker,
+    onToggleColorPicker: handleToggleColorPicker,
+    onColorChange: handleColorChange,
+  }), [editor, handleFontSizeChange, handleCustomFontSizeChange, handleFontChange, 
+       handleBold, handleItalic, handleUnderline, handleColorChange, handleToggleColorPicker]);
 
   // Show loading screen while auth is loading or user is not authenticated
-  if (authLoading || !isAuthenticated) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)' }}>Loading...</div>
+        <div style={{ color: 'var(--text-primary)' }}>Checking authentication...</div>
       </div>
     );
   }
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
-  if (!entry) return <div>Entry not found.</div>;
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>
+      </div>
+    );
+  }
+
+  // Fast loading for new entries - don't show loading spinner
+  if (loading && id !== 'new') {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Loading entry...</div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="text-red-500">Error: {error}</div>
+        <button 
+          onClick={() => router.push("/")}
+          className="ml-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+  
+  if (!entry && id !== 'new') {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Entry not found.</div>
+        <button 
+          onClick={() => router.push("/")}
+          className="ml-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -262,37 +383,7 @@ export default function Page() {
           </button>
         </div>
         
-        <FormattingToolbar
-          // Font props
-          selectedFont={editor.selectedFont}
-          onFontChange={handleFontChange}
-          GOOGLE_FONTS={editor.GOOGLE_FONTS}
-          customFonts={editor.customFonts}
-          recentlyUsedFonts={editor.recentlyUsedFonts}
-          onShowFontDialog={() => editor.setShowFontDialog(true)}
-          
-          // Font size props
-          fontSizeSelected={editor.fontSizeSelected}
-          showCustomInput={editor.showCustomInput}
-          customFontSize={editor.customFontSize}
-          FONT_SIZES={editor.FONT_SIZES}
-          onFontSizeChange={handleFontSizeChange}
-          onCustomFontSizeChange={handleCustomFontSizeChange}
-          
-          // Formatting props
-          isBold={editor.isBold}
-          isItalic={editor.isItalic}
-          isUnderline={editor.isUnderline}
-          onBold={handleBold}
-          onItalic={handleItalic}
-          onUnderline={handleUnderline}
-          
-          // Color props
-          selectedColor={editor.selectedColor}
-          showColorPicker={editor.showColorPicker}
-          onToggleColorPicker={handleToggleColorPicker}
-          onColorChange={handleColorChange}
-        />
+        <FormattingToolbar {...toolbarProps} />
       </div>
       
       {/* Editor Area */}

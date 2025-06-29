@@ -18,9 +18,9 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
   const [customFonts, setCustomFonts] = useState([]);
   const [recentlyUsedFonts, setRecentlyUsedFonts] = useState([]);
 
-  // Load custom fonts from localStorage on mount
+  // Load custom fonts from localStorage on mount - OPTIMIZED
   useEffect(() => {
-    const loadSavedFonts = () => {
+    const loadSavedFonts = async () => {
       try {
         const savedFonts = localStorage.getItem('diary-custom-fonts');
         const savedRecentFonts = localStorage.getItem('diary-recent-fonts');
@@ -29,19 +29,23 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
           const parsedFonts = JSON.parse(savedFonts);
           setCustomFonts(parsedFonts);
           
-          // Re-load font styles for saved fonts
-          parsedFonts.forEach(fontData => {
-            if (fontData.url) {
-              const linkId = `custom-font-${fontData.name.replace(/\s+/g, '-').toLowerCase()}`;
-              if (!document.getElementById(linkId)) {
-                const link = document.createElement('link');
-                link.id = linkId;
-                link.rel = 'stylesheet';
-                link.href = fontData.url;
-                document.head.appendChild(link);
+          // Load font styles asynchronously to avoid blocking
+          setTimeout(() => {
+            parsedFonts.forEach(fontData => {
+              if (fontData.url) {
+                const linkId = `custom-font-${fontData.name.replace(/\s+/g, '-').toLowerCase()}`;
+                if (!document.getElementById(linkId)) {
+                  const link = document.createElement('link');
+                  link.id = linkId;
+                  link.rel = 'stylesheet';
+                  link.href = fontData.url;
+                  link.media = 'print';
+                  link.onload = () => { link.media = 'all'; };
+                  document.head.appendChild(link);
+                }
               }
-            }
-          });
+            });
+          }, 100);
         }
         
         if (savedRecentFonts) {
@@ -55,25 +59,31 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     loadSavedFonts();
   }, []);
 
-  // Save custom fonts to localStorage whenever they change
+  // Save custom fonts to localStorage whenever they change - DEBOUNCED
   useEffect(() => {
     if (customFonts.length > 0) {
-      try {
-        localStorage.setItem('diary-custom-fonts', JSON.stringify(customFonts));
-      } catch (error) {
-        console.error('Error saving custom fonts:', error);
-      }
+      const timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem('diary-custom-fonts', JSON.stringify(customFonts));
+        } catch (error) {
+          console.error('Error saving custom fonts:', error);
+        }
+      }, 500);
+      return () => clearTimeout(timeoutId);
     }
   }, [customFonts]);
 
-  // Save recently used fonts to localStorage whenever they change
+  // Save recently used fonts to localStorage whenever they change - DEBOUNCED
   useEffect(() => {
     if (recentlyUsedFonts.length > 0) {
-      try {
-        localStorage.setItem('diary-recent-fonts', JSON.stringify(recentlyUsedFonts));
-      } catch (error) {
-        console.error('Error saving recent fonts:', error);
-      }
+      const timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem('diary-recent-fonts', JSON.stringify(recentlyUsedFonts));
+        } catch (error) {
+          console.error('Error saving recent fonts:', error);
+        }
+      }, 500);
+      return () => clearTimeout(timeoutId);
     }
   }, [recentlyUsedFonts]);
   const [isBold, setIsBold] = useState(false);

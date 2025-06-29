@@ -5,7 +5,7 @@ import FontSizeSelector from './FontSizeSelector';
 import TextFormattingButtons from './TextFormattingButtons';
 import ColorPicker from './ColorPicker';
 
-export default function FormattingToolbar({
+const FormattingToolbar = React.memo(function FormattingToolbar({
   // Font props
   selectedFont,
   onFontChange,
@@ -78,4 +78,6 @@ export default function FormattingToolbar({
       <button className="px-2 py-1 rounded hover:bg-gray-200">👁️</button>
     </div>
   );
-}
+});
+
+export default FormattingToolbar;

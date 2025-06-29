@@ -12,8 +12,9 @@ export async function GET(request) {
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
     const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit') || '50')));
     const offset = (page - 1) * limit;
+    const specificId = url.searchParams.get('id'); // New: support fetching specific entry
     
-    console.log('Request params:', { page, limit, offset });
+    console.log('Request params:', { page, limit, offset, specificId });
     
     // Test database connection first
     console.log('Testing database connection...');
@@ -30,14 +31,27 @@ export async function GET(request) {
     
     if (user && user.userId) {
       console.log('Using authenticated user query for userId:', user.userId);
-      // Use parameterized query for user_id but string interpolation for LIMIT/OFFSET
-      query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
-      params = [user.userId];
+      
+      if (specificId) {
+        // Fetch specific entry
+        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? AND id = ? LIMIT 1`;
+        params = [user.userId, specificId];
+      } else {
+        // Fetch paginated entries
+        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
+        params = [user.userId];
+      }
     } else {
       // For backward compatibility, get all entries if no user
       console.log('Using public query (no authentication)');
-      query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
-      params = [];
+      
+      if (specificId) {
+        query = `SELECT id, date, content as text, is_shared FROM entries WHERE id = ? LIMIT 1`;
+        params = [specificId];
+      } else {
+        query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
+        params = [];
+      }
     }
     
     console.log('Executing query:', query);
@@ -49,7 +63,7 @@ export async function GET(request) {
     // Add caching headers for better performance
     const response = NextResponse.json({
       entries: rows,
-      pagination: {
+      pagination: specificId ? null : {
         page,
         limit,
         hasMore: rows.length === limit
