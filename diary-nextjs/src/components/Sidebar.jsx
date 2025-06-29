@@ -1,5 +1,7 @@
 'use client';
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../contexts/AuthContext';
 import SettingsDialog from './SettingsDialog';
 
 const menuItems = [
@@ -11,11 +13,18 @@ const menuItems = [
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const { logout, user } = useAuth();
+  const router = useRouter();
 
   const handleMenuClick = (itemName) => {
     if (itemName === 'Setting') {
       setShowSettings(true);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
   };
 
   return (
@@ -73,6 +82,70 @@ export default function Sidebar() {
               </span>
             </a>
           ))}
+          
+          {/* Spacer to push bottom items to the bottom */}
+          <div className="flex-1"></div>
+          
+          {/* User info - moved to bottom with original hover style */}
+          <div
+            className="relative flex items-center w-full px-2 py-3 my-1 rounded-lg transition-colors group mx-auto"
+            style={{
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'var(--sidebar-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="flex items-center justify-center w-10">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                   style={{ 
+                     backgroundColor: 'var(--new-button-bg, #b3e6fa)', 
+                     color: 'var(--new-button-text, #000000)' 
+                   }}>
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            </span>
+            <span
+              className={`overflow-hidden transition-all duration-300 ml-0 ${expanded ? 'opacity-100 w-32 ml-4' : 'opacity-0 w-0'}`}
+              style={{ 
+                display: 'inline-block', 
+                whiteSpace: 'nowrap',
+                color: 'var(--sidebar-text)'
+              }}
+            >
+              {user?.username || 'User'}
+            </span>
+          </div>
+            
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="relative flex items-center w-full px-2 py-3 my-1 rounded-lg transition-colors group mx-auto hover:border-l-4 hover:border-red-400 border-l-4 border-transparent"
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#fee2e2';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+            title="Logout"
+          >
+            <span className="flex items-center justify-center w-10">
+              <img src="/logout.svg" alt="Logout" className="w-7 h-7 mr-1.5" />
+            </span>
+            <span
+              className={`overflow-hidden transition-all duration-300 ml-0 ${expanded ? 'opacity-100 w-32 ml-4' : 'opacity-0 w-0'}`}
+              style={{ 
+                display: 'inline-block', 
+                whiteSpace: 'nowrap',
+                color: '#dc2626'
+              }}
+            >
+              Logout
+            </span>
+          </button>
         </nav>
       </div>
       

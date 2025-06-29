@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useAuth } from "../../../contexts/AuthContext";
 import FormattingToolbar from "../../../components/editor/FormattingToolbar";
 import CustomFontDialog from "../../../components/editor/CustomFontDialog";
 import SaveButton from "../../../components/ui/SaveButton";
@@ -20,6 +21,7 @@ export default function Page() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
+  const { token, isAuthenticated, loading: authLoading } = useAuth();
   
   // Basic state
   const [entry, setEntry] = useState(null);
@@ -30,6 +32,13 @@ export default function Page() {
 
   // Rich text editor hook
   const editor = useRichTextEditor(entry, originalHtml, setOriginalHtml, setIsDirty);
+
+  // Redirect if not authenticated (but wait for auth loading to complete)
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -48,7 +57,16 @@ export default function Page() {
           return;
         }
 
-        const res = await fetch("/api/entries");
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const res = await fetch("/api/entries", { headers });
+        if (!res.ok) throw new Error('Failed to fetch entries');
         const data = await res.json();
         const found = data.find((e) => e.id.toString() === id);
         if (!found) throw new Error("Entry not found");
@@ -59,18 +77,29 @@ export default function Page() {
         setLoading(false);
       }
     };
-    fetchEntry();
-  }, [id]);
+    
+    if (isAuthenticated && token && !authLoading) {
+      fetchEntry();
+    }
+  }, [id, token, isAuthenticated, authLoading]);
 
   const handleSaveAndBack = async () => {
     if (editor.editorRef.current) {
       const htmlContent = editor.editorRef.current.innerHTML;
       
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
       if (id === 'new') {
         // Create new entry
         const res = await fetch("/api/entries", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ 
             text: htmlContent,
             isRichText: true
@@ -81,12 +110,14 @@ export default function Page() {
           setEntry(newEntry);
           setOriginalHtml(htmlContent);
           setIsDirty(false);
+          // Update the URL to reflect the new entry ID without navigation
+          window.history.replaceState(null, '', `/entries/${newEntry.id}`);
         }
       } else {
         // Update existing entry
         const res = await fetch("/api/entries", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ 
             id, 
             text: htmlContent,
@@ -113,9 +144,17 @@ export default function Page() {
     }
     
     if (window.confirm("Are you sure you want to delete this entry?")) {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
       await fetch("/api/entries", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ id }),
       });
       router.push("/");
@@ -177,6 +216,15 @@ export default function Page() {
   const handleToggleColorPicker = () => {
     editor.setShowColorPicker(!editor.showColorPicker);
   };
+
+  // Show loading screen while auth is loading or user is not authenticated
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Loading...</div>
+      </div>
+    );
+  }
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
