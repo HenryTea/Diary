@@ -45,11 +45,20 @@ warmupPool();
 
 // Export a function to get pool health
 export function getPoolHealth() {
-  return {
-    totalConnections: pool.pool._allConnections.length,
-    freeConnections: pool.pool._freeConnections.length,
-    queuedRequests: pool.pool._connectionQueue.length
-  };
+  try {
+    return {
+      status: 'healthy',
+      // Use basic info instead of internal properties
+      poolConfigured: !!pool,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 export default pool;

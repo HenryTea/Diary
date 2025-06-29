@@ -22,9 +22,18 @@ export default function Page() {
   const params = useParams();
   const { id } = params;
   const { token, isAuthenticated, loading: authLoading, user, requiresAuth } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
   
-  // Immediate redirect check - don't wait for auth loading
+  // Ensure component is mounted before checking client-side auth
   useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Immediate redirect check - only after component is mounted
+  useEffect(() => {
+    if (!mounted) return;
+    
     // Check if we have any auth indicators immediately
     const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
     const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
@@ -32,6 +41,7 @@ export default function Page() {
     // If no immediate auth indicators and not currently loading, redirect immediately
     if (!hasToken && !hasUser && !authLoading) {
       console.log('No authentication found, redirecting to login immediately');
+      setShouldRedirect(true);
       router.replace('/login');
       return;
     }
@@ -39,10 +49,11 @@ export default function Page() {
     // Also redirect if auth loading completed and requires auth
     if (!authLoading && requiresAuth) {
       console.log('Authentication required, redirecting to login');
+      setShouldRedirect(true);
       router.replace('/login');
       return;
     }
-  }, [token, user, authLoading, requiresAuth, router]);
+  }, [mounted, token, user, authLoading, requiresAuth, router]);
   
   // Basic state
   const [entry, setEntry] = useState(id === 'new' ? {
@@ -336,32 +347,27 @@ export default function Page() {
   }), [editor, handleFontSizeChange, handleCustomFontSizeChange, handleFontChange, 
        handleBold, handleItalic, handleUnderline, handleColorChange, handleToggleColorPicker]);
 
-  // Show immediate redirect if no auth indicators
+  // Show consistent loading until mounted and auth is determined
+  if (!mounted || authLoading || shouldRedirect) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>
+          Checking authentication...
+        </div>
+      </div>
+    );
+  }
+
+  // After mounting, check if we still need to redirect (additional safety check)
   const hasToken = token || (typeof window !== 'undefined' && localStorage.getItem('token'));
   const hasUser = user || (typeof window !== 'undefined' && localStorage.getItem('user'));
   
   if (!hasToken && !hasUser) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>
-      </div>
-    );
-  }
-
-  // Show loading screen while auth is loading
-  if (authLoading) {
+    // This should rarely be hit due to the useEffect above, but provides safety
+    router.replace('/login');
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ color: 'var(--text-primary)' }}>Checking authentication...</div>
-      </div>
-    );
-  }
-
-  // Show redirect if auth check completed and requires auth
-  if (requiresAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)' }}>Redirecting to login...</div>
       </div>
     );
   }

@@ -18,10 +18,16 @@ export async function GET(request) {
     
     console.log('Request params:', { page, limit, offset, specificId });
     
-    // Get user authentication (no DB call needed here)
+    // Get user authentication with error handling
     console.log('Checking authentication...');
-    const user = verifyToken(request);
-    console.log('User auth result:', user);
+    let user = null;
+    try {
+      user = verifyToken(request);
+      console.log('User auth result:', user);
+    } catch (authError) {
+      console.error('Auth verification error:', authError);
+      user = null;
+    }
     
     let query;
     let params;
@@ -30,13 +36,13 @@ export async function GET(request) {
       console.log('Using authenticated user query for userId:', user.userId);
       
       if (specificId) {
-        // Optimized: Use index on user_id and id
+        // Fetch specific entry
         query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? AND id = ? LIMIT 1`;
         params = [user.userId, specificId];
       } else {
-        // Optimized: Use prepared statement with static limit/offset
-        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ? OFFSET ?`;
-        params = [user.userId, limit, offset];
+        // Use string interpolation for LIMIT/OFFSET to avoid MySQL prepared statement issues
+        query = `SELECT id, date, content as text, is_shared FROM entries WHERE user_id = ? ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
+        params = [user.userId];
       }
     } else {
       console.log('Using public query (no authentication)');
@@ -45,16 +51,24 @@ export async function GET(request) {
         query = `SELECT id, date, content as text, is_shared FROM entries WHERE id = ? LIMIT 1`;
         params = [specificId];
       } else {
-        query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ? OFFSET ?`;
-        params = [limit, offset];
+        // Use string interpolation for LIMIT/OFFSET to avoid MySQL prepared statement issues
+        query = `SELECT id, date, content as text, is_shared FROM entries ORDER BY date DESC LIMIT ${limit} OFFSET ${offset}`;
+        params = [];
       }
     }
     
     console.log('Executing query:', query);
     console.log('With params:', params);
     
-    // Single optimized database call
-    const [rows] = await pool.execute(query, params);
+    // Single optimized database call with error handling
+    let rows;
+    try {
+      const result = await pool.execute(query, params);
+      rows = result[0];
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      throw new Error(`Database error: ${dbError.message}`);
+    }
     
     const dbTime = Date.now() - startTime;
     console.log(`Query successful, got ${rows.length} rows in ${dbTime}ms`);
