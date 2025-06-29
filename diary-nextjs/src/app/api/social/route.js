@@ -1,12 +1,17 @@
-import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
+import pool from '../../../utils/db';
 
-export async function GET() {
+export async function GET(request) {
   try {
-    // Get all shared entries with user info, likes count, and comments count
-    const connection = await mysql.createConnection(process.env.DATABASE_URL);
+    const url = new URL(request.url);
+    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+    const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '20')));
+    const offset = (page - 1) * limit;
     
-    const [entries] = await connection.execute(`
+    // Get all shared entries with user info, likes count, and comments count
+    // Using LEFT JOINs instead of subqueries for better performance
+    // Use string interpolation for LIMIT/OFFSET to avoid MySQL parameter binding issues
+    const [entries] = await pool.execute(`
       SELECT 
         e.id,
         e.content as text,
@@ -15,17 +20,39 @@ export async function GET() {
         e.created_at,
         u.id as user_id,
         u.username,
-        (SELECT COUNT(*) FROM likes l WHERE l.entry_id = e.id) as likes_count,
-        (SELECT COUNT(*) FROM comments c WHERE c.entry_id = e.id) as comments_count
+        COALESCE(like_counts.likes_count, 0) as likes_count,
+        COALESCE(comment_counts.comments_count, 0) as comments_count
       FROM entries e
       JOIN users u ON e.user_id = u.id
+      LEFT JOIN (
+        SELECT entry_id, COUNT(*) as likes_count 
+        FROM likes 
+        GROUP BY entry_id
+      ) like_counts ON e.id = like_counts.entry_id
+      LEFT JOIN (
+        SELECT entry_id, COUNT(*) as comments_count 
+        FROM comments 
+        GROUP BY entry_id
+      ) comment_counts ON e.id = comment_counts.entry_id
       WHERE e.is_shared = TRUE
       ORDER BY e.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `);
     
-    await connection.end();
+    const response = Response.json({
+      entries,
+      pagination: {
+        page,
+        limit,
+        hasMore: entries.length === limit
+      }
+    });
     
-    return Response.json(entries);
+    // Add caching headers for better performance
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    response.headers.set('CDN-Cache-Control', 'public, s-maxage=60');
+    
+    return response;
   } catch (error) {
     console.error('Social entries fetch error:', error);
     return Response.json({ error: 'Failed to fetch social entries' }, { status: 500 });
@@ -81,36 +108,32 @@ export async function POST(request) {
       return Response.json({ error: 'Authorization required' }, { status: 401 });
     }
     
-    const connection = await mysql.createConnection(process.env.DATABASE_URL);
-    
     if (action === 'toggle_like') {
       // Check if user already liked this entry
-      const [existing] = await connection.execute(
+      const [existing] = await pool.execute(
         'SELECT id FROM likes WHERE user_id = ? AND entry_id = ?',
         [userId, entryId]
       );
       
       if (existing.length > 0) {
         // Unlike
-        await connection.execute(
+        await pool.execute(
           'DELETE FROM likes WHERE user_id = ? AND entry_id = ?',
           [userId, entryId]
         );
       } else {
         // Like
-        await connection.execute(
+        await pool.execute(
           'INSERT INTO likes (user_id, entry_id) VALUES (?, ?)',
           [userId, entryId]
         );
       }
       
       // Get updated like count
-      const [likeCount] = await connection.execute(
+      const [likeCount] = await pool.execute(
         'SELECT COUNT(*) as count FROM likes WHERE entry_id = ?',
         [entryId]
       );
-      
-      await connection.end();
       
       return Response.json({ 
         success: true, 
@@ -119,7 +142,6 @@ export async function POST(request) {
       });
     }
     
-    await connection.end();
     return Response.json({ error: 'Invalid action' }, { status: 400 });
     
   } catch (error) {

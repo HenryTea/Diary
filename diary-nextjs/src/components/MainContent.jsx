@@ -7,7 +7,7 @@ import ShareDialog from './ShareDialog';
 export default function MainContent() {
   const [sortAsc, setSortAsc] = useState(true);
   const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true to false for faster perceived loading
   const [error, setError] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,9 +17,9 @@ export default function MainContent() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const searchInputRef = useRef(null);
-  const { token } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
 
-  const fetchEntries = async () => {
+  const fetchEntries = async (useCache = true) => {
     setLoading(true);
     setError(null);
     try {
@@ -27,14 +27,25 @@ export default function MainContent() {
         'Content-Type': 'application/json',
       };
       
+      // Send token if available (for JWT auth)
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
+      // Note: For cookie auth, the browser will automatically send cookies
       
-      const res = await fetch('/api/entries', { headers });
+      if (!useCache) {
+        headers['Cache-Control'] = 'no-cache';
+      }
+      
+      const res = await fetch('/api/entries?page=1&limit=100', { 
+        headers,
+        credentials: 'include' // Important: include cookies for authentication
+      });
       if (!res.ok) throw new Error('Failed to fetch entries');
       const data = await res.json();
-      setEntries(data);
+      
+      // Handle both old format (array) and new format (object with entries)
+      setEntries(data.entries || data);
     } catch {
       setError('Could not load entries.');
     } finally {
@@ -42,11 +53,14 @@ export default function MainContent() {
     }
   };
 
+  // Fetch entries when authentication is ready (either token-based or cookie-based)
   useEffect(() => {
-    if (token) {
+    if (!authLoading) {
+      // Fetch entries regardless of authentication method
+      // The API will handle both authenticated and non-authenticated requests
       fetchEntries();
     }
-  }, [token]);
+  }, [authLoading]);
 
   // Generate suggestions based on search query and type
   useEffect(() => {
@@ -199,7 +213,14 @@ export default function MainContent() {
       <div className="max-w-3xl mx-auto">
         <div className="sticky top-0 z-30 flex items-center justify-between mb-6 py-4 transition-colors duration-300 relative" 
              style={{marginLeft: 0, marginRight: 0}}>
-          <h2 className="text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Entries</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Entries</h2>
+            {loading && (
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Loading...
+              </div>
+            )}
+          </div>
           
           <div className="flex gap-2 items-center relative">
             {/* Search Input - slides from search button */}
@@ -261,8 +282,13 @@ export default function MainContent() {
             <button
               className="p-2 rounded flex items-center justify-center bg-transparent hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 transition-colors"
               title="Reload"
-              onClick={fetchEntries}
-              style={{ height: '38px', width: '38px' }}
+              onClick={() => fetchEntries(false)}
+              disabled={loading}
+              style={{ 
+                height: '38px', 
+                width: '38px',
+                opacity: loading ? 0.5 : 1
+              }}
             >
               <img src="/icons8-refresh.svg" alt="Reload" className="w-6 h-6 toolbar-icon" />
             </button>
@@ -293,11 +319,9 @@ export default function MainContent() {
           </div>
         </div>
         <div className="flex flex-col gap-4">
-          {loading ? (
-            <div className="text-center transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>Loading entries...</div>
-          ) : error ? (
+          {error ? (
             <div className="text-red-500 text-center">{error}</div>
-          ) : sortedEntries.length === 0 ? (
+          ) : sortedEntries.length === 0 && !loading ? (
             <div className="text-center transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>No entries yet.</div>
           ) : (
             sortedEntries.map(entry => (

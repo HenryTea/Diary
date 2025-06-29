@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { stripHtmlTags } from '../../utils/editorUtils';
@@ -8,7 +9,7 @@ import Sidebar from '../../components/Sidebar';
 
 export default function SocialPage() {
   const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true to false for faster perceived loading
   const [error, setError] = useState(null);
   const [commentDialogs, setCommentDialogs] = useState({});
   const [comments, setComments] = useState({});
@@ -23,14 +24,19 @@ export default function SocialPage() {
     }
   }, [requiresAuth, authLoading, router]);
 
-  const fetchSocialEntries = async () => {
+  const fetchSocialEntries = async (useCache = true) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/social');
+      const cacheHeader = useCache ? {} : { 'Cache-Control': 'no-cache' };
+      const res = await fetch('/api/social?page=1&limit=20', {
+        headers: {
+          ...cacheHeader
+        }
+      });
       if (!res.ok) throw new Error('Failed to fetch social entries');
       const data = await res.json();
-      setEntries(data);
+      setEntries(data.entries || data); // Support both old and new format
     } catch (err) {
       setError('Could not load social entries.');
       console.error(err);
@@ -95,12 +101,19 @@ export default function SocialPage() {
     if (!comment?.trim()) return;
 
     try {
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add authorization header if token exists
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
       const res = await fetch('/api/comments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
+        credentials: 'include', // Important: include cookies for authentication
         body: JSON.stringify({
           entryId,
           comment: comment.trim()
@@ -109,10 +122,21 @@ export default function SocialPage() {
 
       if (res.ok) {
         const data = await res.json();
+        console.log('Comment API response:', data); // Debug log
+        
+        // The API returns the comment object directly, not wrapped in a 'comment' property
+        const newCommentData = data.comment || data;
+        
+        // Ensure the comment has a username field
+        if (!newCommentData.username) {
+          console.warn('Comment missing username, using fallback');
+          newCommentData.username = 'Unknown User';
+        }
+        
         // Update comments in state
         setComments(prev => ({
           ...prev,
-          [entryId]: [...(prev[entryId] || []), data.comment]
+          [entryId]: [...(prev[entryId] || []), newCommentData]
         }));
         // Update comment count
         setEntries(prev => prev.map(entry => 
@@ -137,30 +161,25 @@ export default function SocialPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && token) {
+    // Load entries immediately if we have a token, don't wait for full auth check
+    if (token || (!authLoading && isAuthenticated)) {
       fetchSocialEntries();
     }
-  }, [isAuthenticated, token]);
+  }, [token, isAuthenticated, authLoading]);
 
-  // Show loading screen while checking authentication or if authentication required
+  // Separate effect for auth redirects to avoid blocking data loading
+  useEffect(() => {
+    if (!authLoading && requiresAuth) {
+      router.replace('/login');
+    }
+  }, [requiresAuth, authLoading, router]);
+
+  // Show loading screen only while checking authentication
   if (authLoading || requiresAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ color: 'var(--text-primary)' }}>
           {authLoading ? 'Checking access...' : 'Redirecting to login...'}
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <Sidebar />
-        <Header />
-        <div className="pt-24 px-8 mx-auto min-h-screen flex items-center justify-center transition-colors duration-300" 
-             style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
-          <div style={{ color: 'var(--text-primary)' }}>Loading social feed...</div>
         </div>
       </div>
     );
@@ -187,9 +206,37 @@ export default function SocialPage() {
             style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
       <div className="max-w-3xl mx-auto">
         <div className="sticky top-0 z-30 flex items-center justify-between mb-6 py-4 transition-colors duration-300">
-          <h2 className="text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-            Social Feed
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+              Social Feed
+            </h2>
+            {loading && (
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Loading...
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => fetchSocialEntries(false)}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+            style={{ 
+              backgroundColor: 'var(--new-button-bg)', 
+              color: 'var(--new-button-text)' 
+            }}
+          >
+            <Image 
+              src="/icons8-refresh.svg" 
+              alt="Refresh" 
+              width={16}
+              height={16}
+              className="w-4 h-4"
+              style={{ 
+                filter: 'var(--icon-filter)' 
+              }}
+            />
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
         </div>
 
         <div className="flex flex-col gap-6">
@@ -267,11 +314,11 @@ export default function SocialPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                                  style={{ backgroundColor: 'var(--new-button-bg)', color: 'var(--new-button-text)' }}>
-                              {comment.username?.charAt(0).toUpperCase() || 'U'}
+                              {(comment.username || 'Unknown')?.charAt(0).toUpperCase() || 'U'}
                             </div>
                             <span className="font-medium text-sm transition-colors duration-300" 
                                   style={{ color: 'var(--text-primary)' }}>
-                              {comment.username}
+                              {comment.username || 'Unknown User'}
                             </span>
                             <span className="text-xs transition-colors duration-300" 
                                   style={{ color: 'var(--text-secondary)' }}>

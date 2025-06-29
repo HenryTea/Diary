@@ -1,5 +1,5 @@
-import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
+import pool from '../../../utils/db';
 
 // Helper function to get user ID from request
 async function getUserFromRequest(request) {
@@ -43,14 +43,13 @@ export async function GET(request) {
   try {
     const url = new URL(request.url);
     const entryId = url.searchParams.get('entryId');
+    const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit') || '50')));
     
     if (!entryId) {
       return Response.json({ error: 'Entry ID required' }, { status: 400 });
     }
     
-    const connection = await mysql.createConnection(process.env.DATABASE_URL);
-    
-    const [comments] = await connection.execute(`
+    const [comments] = await pool.execute(`
       SELECT 
         c.id,
         c.comment_text,
@@ -60,9 +59,8 @@ export async function GET(request) {
       JOIN users u ON c.user_id = u.id
       WHERE c.entry_id = ?
       ORDER BY c.created_at ASC
-    `, [entryId]);
-    
-    await connection.end();
+      LIMIT ${limit}
+    `, [parseInt(entryId)]);
     
     return Response.json(comments);
   } catch (error) {
@@ -72,8 +70,6 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  let connection;
-  
   try {
     console.log('=== Comment POST Request Start ===');
     
@@ -102,14 +98,9 @@ export async function POST(request) {
       return Response.json({ error: 'Authorization required' }, { status: 401 });
     }
 
-    // Connect to database
-    console.log('Connecting to database...');
-    connection = await mysql.createConnection(process.env.DATABASE_URL);
-    console.log('Database connected successfully');
-
-    // Insert comment
+    // Insert comment using connection pool
     console.log('Inserting comment...');
-    const [result] = await connection.execute(
+    const [result] = await pool.execute(
       'INSERT INTO comments (user_id, entry_id, comment_text) VALUES (?, ?, ?)',
       [parseInt(userId), parseInt(entryId), comment.trim()]
     );
@@ -118,7 +109,7 @@ export async function POST(request) {
 
     // Get the created comment with user info
     console.log('Fetching created comment...');
-    const [newComment] = await connection.execute(`
+    const [newComment] = await pool.execute(`
       SELECT 
         c.id,
         c.comment_text,
@@ -129,59 +120,17 @@ export async function POST(request) {
       WHERE c.id = ?
     `, [result.insertId]);
     
-    console.log('Comment created successfully:', newComment[0]);
-    console.log('=== Comment POST Request End ===');
-
-    return Response.json({ 
-      success: true, 
-      comment: newComment[0] 
-    });
+    console.log('Comment creation successful');
+    return Response.json(newComment[0]);
     
   } catch (error) {
     console.error('=== Comment POST Error ===');
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error errno:', error.errno);
-    console.error('SQL State:', error.sqlState);
-    console.error('SQL Message:', error.sqlMessage);
-    console.error('Full error:', error);
-    console.error('=== End Comment POST Error ===');
-    
-    // Return different errors based on type
-    if (error.code === 'ER_NO_SUCH_TABLE') {
-      return Response.json({ 
-        error: 'Database table not found',
-        details: 'Comments table may not exist'
-      }, { status: 500 });
-    }
-    
-    if (error.code === 'ER_BAD_FIELD_ERROR') {
-      return Response.json({ 
-        error: 'Database field error',
-        details: 'Table structure may be incorrect'
-      }, { status: 500 });
-    }
-    
-    if (error.code?.startsWith('ER_')) {
-      return Response.json({ 
-        error: 'Database error',
-        details: process.env.NODE_ENV === 'development' ? error.message : 'Database operation failed'
-      }, { status: 500 });
-    }
-    
+    console.error('Error details:', error);
+    console.error('Error stack:', error.stack);
     return Response.json({ 
-      error: 'Failed to create comment',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error: 'Failed to create comment', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 });
-    
-  } finally {
-    if (connection) {
-      try {
-        await connection.end();
-        console.log('Database connection closed');
-      } catch (closeError) {
-        console.error('Error closing connection:', closeError);
-      }
-    }
   }
 }
