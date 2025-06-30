@@ -1,8 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "../contexts/ThemeContext";
-import { AuthProvider } from "../contexts/AuthContext";
-import RouterErrorBoundary from "../components/RouterErrorBoundary";
+import { ThemeProvider } from "../src/contexts/ThemeContext";
+import { AuthProvider } from "../src/contexts/AuthContext";
+import RouterErrorBoundary from "../src/components/RouterErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

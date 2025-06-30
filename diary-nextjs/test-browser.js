@@ -1,5 +1,5 @@
 // Test what the browser is actually sending
-const fetch = require('node-fetch');
+// Using built-in fetch (available in Node.js 18+)
 
 async function testBrowserLikeRequest() {
   try {

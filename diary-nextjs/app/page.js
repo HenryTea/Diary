@@ -1,12 +1,12 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
-import { secureStorage } from '../utils/security';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
-import MainContent from '../components/MainContent';
-import NewEntryButton from '../components/NewEntryButton';
+import { useAuth } from '../src/contexts/AuthContext';
+import { secureStorage } from '../src/utils/security';
+import Header from '../src/components/Header';
+import Sidebar from '../src/components/Sidebar';
+import MainContent from '../src/components/MainContent';
+import NewEntryButton from '../src/components/NewEntryButton';
 
 export default function Home() {
   const { loading, requiresAuth, token, user } = useAuth();

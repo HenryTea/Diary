@@ -90,22 +90,40 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    setUser(null);
-    setToken(null);
+    console.log('AuthContext: Starting logout process...');
+    
     try {
-      // Clear secure storage
-      secureStorage.removeUser();
-      secureStorage.removeToken();
+      setLoading(true);
       
-      // Clear authentication cookie
+      // Clear authentication cookie first
       await fetch('/api/auth-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear_auth_cookie' })
       });
       
+      // Clear secure storage
+      secureStorage.removeUser();
+      secureStorage.removeToken();
+      
+      // Clear state
+      setUser(null);
+      setToken(null);
+      setIpCheckRequired(true);
+      
+      console.log('AuthContext: Logout completed successfully');
+      
     } catch (error) {
-      console.error('Error clearing auth or cookie:', error);
+      console.error('AuthContext: Error during logout:', error);
+      
+      // Still clear local state even if server call fails
+      secureStorage.removeUser();
+      secureStorage.removeToken();
+      setUser(null);
+      setToken(null);
+      setIpCheckRequired(true);
+    } finally {
+      setLoading(false);
     }
   };
 

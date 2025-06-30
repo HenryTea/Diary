@@ -28,9 +28,17 @@ export default function Sidebar() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      console.log('Logging out...');
+      await logout();
+      console.log('Logout successful, redirecting to login...');
+      router.replace('/login'); // Use replace instead of push
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still redirect to login even if logout fails
+      router.replace('/login');
+    }
   };
 
   return (

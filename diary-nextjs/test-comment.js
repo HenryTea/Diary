@@ -1,5 +1,5 @@
 // Test comment creation
-const http = require('http');
+import http from 'http';
 
 const postData = JSON.stringify({
   entryId: 5,

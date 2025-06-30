@@ -1,6 +1,4 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -11,6 +9,8 @@ const nextConfig: NextConfig = {
   },
   // Add compression and caching headers + Security headers
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+    
     return [
       {
         source: '/(.*)',
@@ -20,11 +20,15 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' fonts.googleapis.com",
+              isDev 
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' fonts.googleapis.com data:"
+                : "script-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "font-src 'self' fonts.gstatic.com data:",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self'",
+              isDev 
+                ? "connect-src 'self' ws: wss: data: blob:"
+                : "connect-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -85,7 +89,7 @@ const nextConfig: NextConfig = {
     }
     
     // Optimize for production builds
-    if (!config.isServer) {
+    if (!isServer) {
       config.optimization = {
         ...config.optimization,
         sideEffects: false,
