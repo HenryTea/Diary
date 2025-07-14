@@ -1,6 +1,7 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { secureStorage } from '../utils/security';
+import { authManager } from '../utils/authManager';
 
 const AuthContext = createContext();
 
@@ -8,90 +9,98 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ipCheckRequired, setIpCheckRequired] = useState(false);
+  const mountedRef = useRef(true);
 
-  // Check cookie-based authentication
-  const checkCookieAuth = async () => {
+  // Debounced auth check using the auth manager
+  const checkCookieAuth = useCallback(async (forceRefresh = false) => {
+    if (!mountedRef.current) return;
+
     try {
-      // Always start by requiring auth until proven otherwise
       setIpCheckRequired(true);
       
-      // Check authentication cookie
-      const authResponse = await fetch('/api/auth-check');
-      const authData = await authResponse.json();
+      console.log('🔍 Auth: Starting debounced check...');
+      const authData = await authManager.checkAuth(forceRefresh);
       
-      console.log('Cookie auth check result:', authData);
+      if (!mountedRef.current) return; // Component unmounted during async operation
+      
+      console.log('📊 Auth cache stats:', authManager.getCacheStats());
       
       // Only allow access if explicitly authenticated with valid cookie
       if (authData.isAuthenticated && authData.user && !authData.requiresAuth) {
         setUser(authData.user);
         setIpCheckRequired(false);
-        // Store user data locally for faster access
         secureStorage.setUser(authData.user);
-        console.log('Valid authentication found, user logged in');
+        console.log('✅ Auth: Valid authentication found');
       } else {
-        // Force login for any invalid/missing authentication
-        console.log('Invalid or missing authentication, forcing login');
+        console.log('🚫 Auth: Invalid/missing authentication');
         setUser(null);
         setIpCheckRequired(true);
         secureStorage.removeUser();
       }
       
     } catch (error) {
-      console.error('Error checking cookie auth:', error);
-      // On any error, force authentication
-      console.log('Auth check error, forcing login');
-      setUser(null);
-      setIpCheckRequired(true);
-      secureStorage.removeUser();
+      console.error('❌ Auth: Error during check:', error);
+      if (mountedRef.current) {
+        setUser(null);
+        setIpCheckRequired(true);
+        secureStorage.removeUser();
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
-    // Check cookie-based authentication on mount
+    // Single auth check on mount with debouncing
     checkCookieAuth();
-  }, []);
+    
+    // Cleanup function
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [checkCookieAuth]);
 
   const login = async (userData) => {
     setUser(userData);
     setIpCheckRequired(false);
     
     try {
-      // Use secure storage for faster access
       secureStorage.setUser(userData);
-      
+      // Clear auth cache since user state changed
+      authManager.clearCache();
+      console.log('🔄 Auth: Cache cleared after login');
     } catch (error) {
       console.error('Error storing auth data:', error);
     }
   };
 
   const logout = async () => {
-    console.log('AuthContext: Starting logout process...');
+    console.log('🚪 Auth: Starting logout process...');
     
     try {
       setLoading(true);
       
-      // Clear authentication cookie
       await fetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
       
-      // Clear secure storage
       secureStorage.removeUser();
+      authManager.clearCache(); // Clear auth cache on logout
       
-      // Clear state
       setUser(null);
       setIpCheckRequired(true);
       
-      console.log('AuthContext: Logout completed successfully');
+      console.log('✅ Auth: Logout completed, cache cleared');
       
     } catch (error) {
-      console.error('AuthContext: Error during logout:', error);
+      console.error('❌ Auth: Error during logout:', error);
       
       // Still clear local state even if server call fails
       secureStorage.removeUser();
+      authManager.clearCache();
       setUser(null);
       setIpCheckRequired(true);
     } finally {
@@ -99,11 +108,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Force refresh auth check (bypasses cache)
+  const refreshAuth = useCallback(() => {
+    console.log('🔄 Auth: Force refresh requested');
+    return checkCookieAuth(true);
+  }, [checkCookieAuth]);
+
   const value = {
     user,
     loading,
     login,
     logout,
+    refreshAuth, // New method to force refresh
     isAuthenticated: !!user && !ipCheckRequired,
     requiresAuth: ipCheckRequired || !user
   };

@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { stripHtmlTags } from '../utils/editorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import ShareDialog from './ShareDialog';
@@ -19,7 +20,7 @@ export default function MainContent() {
   const searchInputRef = useRef(null);
   const { token, user, loading: authLoading } = useAuth();
 
-  const fetchEntries = async (useCache = true) => {
+  const fetchEntries = useCallback(async (useCache = true) => {
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +52,7 @@ export default function MainContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   // Fetch entries when authentication is ready (either token-based or cookie-based)
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function MainContent() {
       // The API will handle both authenticated and non-authenticated requests
       fetchEntries();
     }
-  }, [authLoading]);
+  }, [authLoading, fetchEntries]);
 
   // Refetch entries when the window gets focus (user returns from editor)
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function MainContent() {
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [authLoading]);
+  }, [authLoading, fetchEntries]);
 
   // Refetch entries when the component mounts (user navigates back)
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function MainContent() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [authLoading]);
+  }, [authLoading, fetchEntries]);
 
   // Generate suggestions based on search query and type
   useEffect(() => {
@@ -320,7 +321,7 @@ export default function MainContent() {
       }
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [fetchEntries]);
 
   // Periodic refresh as backup (every 30 seconds when tab is visible)
   useEffect(() => {
@@ -331,7 +332,7 @@ export default function MainContent() {
     }, 30000); // 30 seconds
 
     return () => clearInterval(intervalId);
-  }, [authLoading]);
+  }, [authLoading, fetchEntries]);
 
   return (
     <main className="pt-24 px-8 mx-auto min-h-screen transition-colors duration-300" 
@@ -416,7 +417,7 @@ export default function MainContent() {
                 opacity: loading ? 0.5 : 1
               }}
             >
-              <img src="/icons8-refresh.svg" alt="Reload" className="w-6 h-6 toolbar-icon" />
+              <Image src="/icons8-refresh.svg" alt="Reload" width={24} height={24} className="toolbar-icon" />
             </button>
             
             {/* Search Button */}
@@ -426,7 +427,7 @@ export default function MainContent() {
               onClick={handleSearchToggle}
               style={{ height: '38px', width: '38px' }}
             >
-              <img src="/icons8-search.svg" alt="Search" className="w-6 h-6 toolbar-icon" />
+              <Image src="/icons8-search.svg" alt="Search" width={24} height={24} className="toolbar-icon" />
             </button>
             
             {/* Sort Button */}
@@ -436,10 +437,12 @@ export default function MainContent() {
               onClick={() => setSortAsc((v) => !v)}
               style={{ height: '38px', width: '38px' }}
             >
-              <img
+              <Image
                 src={sortAsc ? "/sort-amount-up-svgrepo-com.svg" : "/sort-amount-down-svgrepo-com.svg"}
                 alt={sortAsc ? "Sort Ascending" : "Sort Descending"}
-                className="w-6 h-6 toolbar-icon"
+                width={24}
+                height={24}
+                className="toolbar-icon"
               />
             </button>
           </div>
@@ -469,7 +472,7 @@ export default function MainContent() {
                   title="Share entry"
                   onClick={e => handleShare(entry, e)}
                 >
-                  <img src="/icon/share.svg" alt="Share" className="w-5 h-5" />
+                  <Image src="/icon/share.svg" alt="Share" width={20} height={20} />
                 </button>
                 <div className="font-bold mb-1 transition-colors duration-300" style={{ color: '#72b3c8' }}>
                   {new Date(entry.date).toLocaleString('en-US', {

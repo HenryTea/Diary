@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
@@ -209,10 +209,10 @@ export default function SocialPage() {
       }
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [commentDialogs]); // Dependencies for the cross-tab sync
+  }, [commentDialogs, fetchSocialEntries, handleShowComments]); // Dependencies for the cross-tab sync
 
   // Function definitions that are used in hooks
-  const fetchSocialEntries = async (useCache = true) => {
+  const fetchSocialEntries = useCallback(async (useCache = true) => {
     // Prevent multiple simultaneous requests
     if (loading) {
       console.log('Social: Skipping fetch - already loading');
@@ -237,9 +237,9 @@ export default function SocialPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading]);
 
-  const handleShowComments = async (entryId) => {
+  const handleShowComments = useCallback(async (entryId) => {
     setCommentDialogs(prev => ({
       ...prev,
       [entryId]: !prev[entryId]
@@ -260,7 +260,7 @@ export default function SocialPage() {
         console.error('Comments fetch error:', error);
       }
     }
-  };
+  }, [comments]);
 
   // Load entries immediately if we have a token, don't wait for full auth check
   useEffect(() => {
@@ -269,7 +269,7 @@ export default function SocialPage() {
         console.error('Social: Error in initial load:', error);
       });
     }
-  }, [token, isAuthenticated, authLoading]);
+  }, [token, isAuthenticated, authLoading, fetchSocialEntries]);
 
   // Separate effect for auth redirects to avoid blocking data loading
   useEffect(() => {
@@ -314,7 +314,7 @@ export default function SocialPage() {
       window.removeEventListener('keydown', trackActivity);
       window.removeEventListener('scroll', trackActivity);
     };
-  }, [authLoading, token, isAuthenticated]);
+  }, [authLoading, token, isAuthenticated, fetchSocialEntries]);
 
   // Refresh on window focus and visibility change
   useEffect(() => {
@@ -341,7 +341,7 @@ export default function SocialPage() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [authLoading, token, isAuthenticated]);
+  }, [authLoading, token, isAuthenticated, fetchSocialEntries]);
 
   const handleLike = async (entryId) => {
     // Optimistic update - immediately update UI
@@ -514,8 +514,8 @@ export default function SocialPage() {
   // Show consistent loading until mounted and auth is determined
   if (!mounted || authLoading || shouldRedirect) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)' }}>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }} className="text-sm sm:text-base text-center">
           Checking access...
         </div>
       </div>
@@ -530,8 +530,8 @@ export default function SocialPage() {
     // This should rarely be hit due to the useEffect above, but provides safety
     router.replace('/login');
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)' }}>Checking access...</div>
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }} className="text-sm sm:text-base text-center">Checking access...</div>
       </div>
     );
   }
@@ -541,9 +541,9 @@ export default function SocialPage() {
       <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <Sidebar />
         <Header />
-        <div className="pt-24 px-8 mx-auto min-h-screen flex items-center justify-center transition-colors duration-300" 
+        <div className="pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 mx-auto min-h-screen flex items-center justify-center transition-colors duration-300" 
              style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
-          <div className="text-red-500">{error}</div>
+          <div className="text-red-500 text-center text-sm sm:text-base px-4">{error}</div>
         </div>
       </div>
     );
@@ -553,16 +553,17 @@ export default function SocialPage() {
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Sidebar />
       <Header />
-      <main className="pt-24 px-8 mx-auto min-h-screen transition-colors duration-300" 
+      <main className="pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 mx-auto min-h-screen transition-colors duration-300" 
             style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
       <div className="max-w-3xl mx-auto">
-        <div className="sticky top-0 z-30 flex items-center justify-between mb-6 py-4 transition-colors duration-300">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+        <div className="sticky top-20 sm:top-24 z-30 flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 py-3 sm:py-4 transition-colors duration-300 bg-opacity-95 backdrop-blur-sm gap-4 sm:gap-0"
+             style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <h2 className="text-xl sm:text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
               Social Feed
             </h2>
             {loading && (
-              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <div className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Loading...
               </div>
             )}
@@ -570,7 +571,7 @@ export default function SocialPage() {
           <button
             onClick={() => fetchSocialEntries(false)}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 hover:opacity-80 disabled:opacity-50 text-sm sm:text-base w-full sm:w-auto justify-center sm:justify-start"
             style={{ 
               backgroundColor: 'var(--new-button-bg)', 
               color: 'var(--new-button-text)' 
@@ -581,7 +582,7 @@ export default function SocialPage() {
               alt="Refresh" 
               width={16}
               height={16}
-              className="w-4 h-4"
+              className="w-3 h-3 sm:w-4 sm:h-4"
               style={{ 
                 filter: 'var(--icon-filter)' 
               }}
@@ -590,33 +591,33 @@ export default function SocialPage() {
           </button>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {entries.length === 0 ? (
-            <div className="text-center transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
-              No shared entries yet.
+            <div className="text-center py-8 sm:py-12 transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-sm sm:text-base">No shared entries yet.</p>
             </div>
           ) : (
             entries.map(entry => (
               <div
                 key={entry.id}
-                className="rounded-lg p-6 transition-all duration-300"
+                className="rounded-lg p-4 sm:p-6 transition-all duration-300"
                 style={{ backgroundColor: 'var(--entries-bg)' }}
               >
                 {/* User Info */}
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mr-3"
+                <div className="flex items-center mb-3 sm:mb-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold mr-3"
                        style={{ backgroundColor: 'var(--new-button-bg)', color: 'var(--new-button-text)' }}>
                     {entry.username?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                  <div>
-                    <div className="font-semibold transition-colors duration-300" 
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm sm:text-base transition-colors duration-300 truncate" 
                          style={{ color: 'var(--text-primary)' }}>
                       {entry.username}
                     </div>
-                    <div className="text-sm transition-colors duration-300" 
+                    <div className="text-xs sm:text-sm transition-colors duration-300" 
                          style={{ color: 'var(--text-secondary)' }}>
                       {new Date(entry.date).toLocaleString('en-US', {
-                        year: 'numeric', month: 'long', day: 'numeric',
+                        year: 'numeric', month: 'short', day: 'numeric',
                         hour: '2-digit', minute: '2-digit', weekday: 'short'
                       })}
                     </div>
@@ -624,10 +625,10 @@ export default function SocialPage() {
                 </div>
 
                 {/* Entry Content */}
-                <div className="mb-4 p-4 rounded transition-colors duration-300"
+                <div className="mb-3 sm:mb-4 p-3 sm:p-4 rounded transition-colors duration-300"
                      style={{ backgroundColor: 'var(--entries-text-bg)', color: 'var(--entries-text)' }}>
                   <div 
-                    className="whitespace-pre-wrap prose prose-sm max-w-none"
+                    className="whitespace-pre-wrap prose prose-xs sm:prose-sm max-w-none text-sm sm:text-base leading-relaxed"
                     style={{ color: 'var(--entries-text)' }}
                     dangerouslySetInnerHTML={{ 
                       __html: entry.is_rich_text ? (entry.text || 'Empty entry') : entry.text || 'Empty entry'
@@ -639,20 +640,20 @@ export default function SocialPage() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => handleLike(entry.id)}
-                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
-                    <span className="text-red-500">❤️</span>
-                    <span className="text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-red-500 text-base sm:text-lg">❤️</span>
+                    <span className="text-xs sm:text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                       {entry.likes_count || 0}
                     </span>
                   </button>
 
                   <button
                     onClick={() => handleShowComments(entry.id)}
-                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
-                    <span>💬</span>
-                    <span className="text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-base sm:text-lg">💬</span>
+                    <span className="text-xs sm:text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                       {entry.comments_count || 0}
                     </span>
                   </button>
@@ -660,27 +661,27 @@ export default function SocialPage() {
 
                 {/* Comments Section */}
                 {commentDialogs[entry.id] && (
-                  <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="mt-3 sm:mt-4 border-t pt-3 sm:pt-4" style={{ borderColor: 'var(--border-color)' }}>
                     {/* Existing Comments */}
-                    <div className="mb-4 max-h-60 overflow-y-auto">
+                    <div className="mb-3 sm:mb-4 max-h-48 sm:max-h-60 overflow-y-auto">
                       {comments[entry.id]?.map(comment => (
-                        <div key={comment.id} className="mb-3 p-3 rounded transition-colors duration-300"
+                        <div key={comment.id} className="mb-2 sm:mb-3 p-2 sm:p-3 rounded transition-colors duration-300"
                              style={{ backgroundColor: 'var(--bg-content)' }}>
                           <div className="flex items-center gap-2 mb-1">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold"
                                  style={{ backgroundColor: 'var(--new-button-bg)', color: 'var(--new-button-text)' }}>
                               {(comment.username || 'Unknown')?.charAt(0).toUpperCase() || 'U'}
                             </div>
-                            <span className="font-medium text-sm transition-colors duration-300" 
+                            <span className="font-medium text-xs sm:text-sm transition-colors duration-300 truncate flex-1" 
                                   style={{ color: 'var(--text-primary)' }}>
                               {comment.username || 'Unknown User'}
                             </span>
-                            <span className="text-xs transition-colors duration-300" 
+                            <span className="text-xs transition-colors duration-300 flex-shrink-0" 
                                   style={{ color: 'var(--text-secondary)' }}>
                               {new Date(comment.created_at).toLocaleString()}
                             </span>
                           </div>
-                          <div className="text-sm transition-colors duration-300" 
+                          <div className="text-xs sm:text-sm transition-colors duration-300 leading-relaxed" 
                                style={{ color: 'var(--text-primary)' }}>
                             {comment.comment_text}
                           </div>
@@ -689,7 +690,7 @@ export default function SocialPage() {
                     </div>
 
                     {/* Add Comment */}
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
                         value={newComment[entry.id] || ''}
@@ -698,7 +699,7 @@ export default function SocialPage() {
                           [entry.id]: e.target.value
                         }))}
                         placeholder="Write a comment..."
-                        className="flex-1 px-3 py-2 rounded border transition-colors duration-300"
+                        className="flex-1 px-3 py-2 rounded border transition-colors duration-300 text-sm sm:text-base"
                         style={{
                           backgroundColor: 'var(--bg-content)',
                           borderColor: 'var(--border-color)',
@@ -712,7 +713,7 @@ export default function SocialPage() {
                       />
                       <button
                         onClick={() => handleAddComment(entry.id)}
-                        className="px-4 py-2 rounded text-white transition-colors duration-300 hover:opacity-80"
+                        className="px-3 sm:px-4 py-2 rounded text-white transition-colors duration-300 hover:opacity-80 text-sm sm:text-base whitespace-nowrap touch-manipulation"
                         style={{ backgroundColor: 'var(--new-button-bg)', color: 'var(--new-button-text)' }}
                       >
                         Post

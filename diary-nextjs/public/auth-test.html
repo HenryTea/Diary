@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AuthManager Debouncing Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .warning { color: orange; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🧪 AuthManager Debouncing Test</h1>
+    <p>This page tests the authManager debouncing functionality in a real browser environment.</p>
+
+    <div class="test-section">
+        <h3>Test 1: Rapid Fire Auth Calls</h3>
+        <button onclick="testRapidCalls()">Make 10 Rapid Auth Calls</button>
+        <div id="rapid-log" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 2: Cache Effectiveness</h3>
+        <button onclick="testCache()">Test Cache (2 calls with delay)</button>
+        <div id="cache-log" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 3: Force Refresh</h3>
+        <button onclick="testForceRefresh()">Test Force Refresh</button>
+        <div id="refresh-log" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Console Output</h3>
+        <p>Check browser console for detailed authManager logs with emojis!</p>
+        <button onclick="console.clear()">Clear Console</button>
+    </div>
+
+    <script type="module">
+        // Since we can't import modules directly in a static HTML file,
+        // we'll test the auth endpoint directly with fetch and simulate debouncing
+
+        class TestAuthManager {
+            constructor() {
+                this.cache = new Map();
+                this.pendingRequests = new Map();
+                this.lastCheck = 0;
+                this.CACHE_DURATION = 30000;
+                this.REQUEST_COOLDOWN = 1000;
+            }
+
+            async checkAuth(forceRefresh = false) {
+                const now = Date.now();
+                const cacheKey = 'auth_status';
+
+                if (!forceRefresh && this.cache.has(cacheKey)) {
+                    const cached = this.cache.get(cacheKey);
+                    if (now - cached.timestamp < this.CACHE_DURATION) {
+                        console.log('🎯 Auth: Using cached result');
+                        return { ...cached.data, source: 'cache' };
+                    }
+                }
+
+                if (now - this.lastCheck < this.REQUEST_COOLDOWN) {
+                    console.log('⏱️ Auth: Request too soon, using cache or waiting...');
+                    if (this.cache.has(cacheKey)) {
+                        return { ...this.cache.get(cacheKey).data, source: 'cooldown' };
+                    }
+                }
+
+                if (this.pendingRequests.has(cacheKey)) {
+                    console.log('🔄 Auth: Request already pending, waiting for result...');
+                    return this.pendingRequests.get(cacheKey);
+                }
+
+                const authPromise = this.performAuthCheck();
+                this.pendingRequests.set(cacheKey, authPromise);
+                this.lastCheck = now;
+
+                try {
+                    const result = await authPromise;
+                    this.cache.set(cacheKey, {
+                        data: { ...result, source: 'network' },
+                        timestamp: now
+                    });
+                    console.log('✅ Auth: New check completed and cached');
+                    return { ...result, source: 'network' };
+                } catch (error) {
+                    console.error('❌ Auth: Check failed:', error);
+                    throw error;
+                } finally {
+                    this.pendingRequests.delete(cacheKey);
+                }
+            }
+
+            async performAuthCheck() {
+                const response = await fetch('/api/auth-check', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                if (!response.ok) {
+                    throw new Error(`Auth check failed: ${response.status}`);
+                }
+                return response.json();
+            }
+
+            getCacheStats() {
+                return {
+                    cacheSize: this.cache.size,
+                    pendingRequests: this.pendingRequests.size,
+                    lastCheck: this.lastCheck
+                };
+            }
+
+            clearCache() {
+                this.cache.clear();
+                this.pendingRequests.clear();
+            }
+        }
+
+        const testAuthManager = new TestAuthManager();
+        window.testAuthManager = testAuthManager;
+
+        window.testRapidCalls = async function() {
+            const log = document.getElementById('rapid-log');
+            log.textContent = 'Starting rapid fire test...\n';
+            
+            const start = Date.now();
+            const promises = [];
+            
+            for (let i = 0; i < 10; i++) {
+                log.textContent += `Making call ${i + 1}...\n`;
+                promises.push(testAuthManager.checkAuth().catch(err => ({ error: err.message })));
+            }
+
+            try {
+                const results = await Promise.all(promises);
+                const end = Date.now();
+                
+                log.textContent += `\n✅ All 10 calls completed in ${end - start}ms\n`;
+                log.textContent += `📊 Cache stats: ${JSON.stringify(testAuthManager.getCacheStats())}\n`;
+                
+                const sources = results.map(r => r.source || 'error');
+                const sourceCounts = sources.reduce((acc, source) => {
+                    acc[source] = (acc[source] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                log.textContent += `🎯 Source breakdown: ${JSON.stringify(sourceCounts)}\n`;
+                
+                if (sourceCounts.network <= 2 && (sourceCounts.cache > 0 || sourceCounts.cooldown > 0)) {
+                    log.textContent += '✅ SUCCESS: Debouncing is working! Most calls used cache/cooldown.\n';
+                } else {
+                    log.textContent += '⚠️ WARNING: Too many network requests. Debouncing may not be optimal.\n';
+                }
+                
+            } catch (error) {
+                log.textContent += `❌ Error: ${error.message}\n`;
+            }
+        };
+
+        window.testCache = async function() {
+            const log = document.getElementById('cache-log');
+            log.textContent = 'Testing cache effectiveness...\n';
+            
+            testAuthManager.clearCache();
+            
+            try {
+                // First call
+                const start1 = Date.now();
+                const result1 = await testAuthManager.checkAuth();
+                const end1 = Date.now();
+                log.textContent += `First call: ${end1 - start1}ms (${result1.source})\n`;
+                
+                // Wait 2 seconds
+                log.textContent += 'Waiting 2 seconds...\n';
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Second call
+                const start2 = Date.now();
+                const result2 = await testAuthManager.checkAuth();
+                const end2 = Date.now();
+                log.textContent += `Second call: ${end2 - start2}ms (${result2.source})\n`;
+                
+                if (result2.source === 'cache' && end2 - start2 < 10) {
+                    log.textContent += '✅ SUCCESS: Second call used cache and was fast!\n';
+                } else {
+                    log.textContent += '⚠️ Second call did not use cache as expected.\n';
+                }
+                
+            } catch (error) {
+                log.textContent += `❌ Error: ${error.message}\n`;
+            }
+        };
+
+        window.testForceRefresh = async function() {
+            const log = document.getElementById('refresh-log');
+            log.textContent = 'Testing force refresh...\n';
+            
+            try {
+                // Normal call
+                const result1 = await testAuthManager.checkAuth();
+                log.textContent += `Normal call: ${result1.source}\n`;
+                
+                // Force refresh
+                const result2 = await testAuthManager.checkAuth(true);
+                log.textContent += `Force refresh: ${result2.source}\n`;
+                
+                if (result2.source === 'network') {
+                    log.textContent += '✅ SUCCESS: Force refresh bypassed cache!\n';
+                } else {
+                    log.textContent += '⚠️ Force refresh did not work as expected.\n';
+                }
+                
+            } catch (error) {
+                log.textContent += `❌ Error: ${error.message}\n`;
+            }
+        };
+
+        // Auto-run a simple test on page load
+        console.log('🎉 AuthManager test page loaded! Run tests using the buttons above.');
+        console.log('🔍 Watch the console for detailed authManager logs with emojis!');
+    </script>
+</body>
+</html>

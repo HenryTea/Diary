@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export default function Header({ onBurgerClick }) {
   return (
@@ -15,7 +16,7 @@ export default function Header({ onBurgerClick }) {
         <span className="block w-6 h-1 rounded transition-colors duration-300" style={{ backgroundColor: 'var(--text-secondary)' }}></span>
       </button>
       <div className="flex mx-auto gap-2">
-          <img src="/header-icon.svg" alt="Diary" className="w-8 h-8 mt--1 sidebar-icon" />
+          <Image src="/header-icon.svg" alt="Diary" width={32} height={32} className="mt--1 sidebar-icon" />
           <h1 className="text-xl font-bold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Diary</h1>
       </div>
       <div className="w-8" /> {/* Spacer for symmetry */}

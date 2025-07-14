@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsDialog from './SettingsDialog';
@@ -80,10 +81,12 @@ export default function Sidebar() {
               }}
             >
               <span className="flex items-center justify-center w-10">
-                <img 
+                <Image 
                   src={item.icon} 
                   alt={item.name} 
-                  className="w-7 h-7 sidebar-icon" 
+                  width={28}
+                  height={28}
+                  className="sidebar-icon" 
                 />
               </span>
               <span
@@ -150,7 +153,7 @@ export default function Sidebar() {
             title="Logout"
           >
             <span className="flex items-center justify-center w-10">
-              <img src="/logout.svg" alt="Logout" className="w-7 h-7" />
+              <Image src="/logout.svg" alt="Logout" width={28} height={28} />
             </span>
             <span
               className={`overflow-hidden transition-all duration-300 ml-0 ${expanded ? 'opacity-100 w-32 ml-4' : 'opacity-0 w-0'}`}
