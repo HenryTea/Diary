@@ -8,6 +8,14 @@ export async function GET(request) {
     const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '20')));
     const offset = (page - 1) * limit;
     
+    // Get current user if authenticated
+    let currentUser = null;
+    try {
+      currentUser = verifyToken(request);
+    } catch (error) {
+      // User not authenticated, continue without user context
+    }
+    
     // Get all public/shared entries
     const publicEntries = await jsonDb.getPublicEntries();
     
@@ -17,12 +25,19 @@ export async function GET(request) {
     // Paginate
     const paginatedEntries = publicEntries.slice(offset, offset + limit);
     
-    // Enhance each entry with user info, likes count, and comments count
+    // Enhance each entry with user info, likes count, comments count, and user's like status
     const enhancedEntries = await Promise.all(
       paginatedEntries.map(async (entry) => {
         const user = await jsonDb.findUserById(entry.user_id);
         const likesCount = await jsonDb.countLikes(entry.id);
         const comments = await jsonDb.findCommentsByEntryId(entry.id);
+        
+        // Check if current user has liked this entry
+        let userLiked = false;
+        if (currentUser && currentUser.userId) {
+          const existingLike = await jsonDb.findLike(currentUser.userId, entry.id);
+          userLiked = !!existingLike;
+        }
         
         return {
           id: entry.id,
@@ -33,7 +48,8 @@ export async function GET(request) {
           user_id: entry.user_id,
           username: user?.username || 'Unknown',
           likes_count: likesCount,
-          comments_count: comments.length
+          comments_count: comments.length,
+          user_liked: userLiked
         };
       })
     );

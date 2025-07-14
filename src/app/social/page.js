@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,8 +15,13 @@ export default function SocialPage() {
   const [newComment, setNewComment] = useState({});
   const [mounted, setMounted] = useState(false);
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [userLikes, setUserLikes] = useState(new Set()); // Track which entries the user has liked
+  const [expandedEntries, setExpandedEntries] = useState(new Set()); // Track which entries are expanded
   const { token, isAuthenticated, loading: authLoading, requiresAuth, user } = useAuth();
   const router = useRouter();
+  
+  // Use ref to track loading state without causing dependency loops
+  const loadingRef = useRef(false);
 
   // Ensure component is mounted before checking client-side auth
   useEffect(() => {
@@ -67,7 +72,189 @@ export default function SocialPage() {
     }
   }, [mounted, token, user, authLoading, requiresAuth, router]);
 
-  // Cross-tab synchronization for social entries - MOVED HERE TO FIX HOOKS ORDER
+  // Function definitions that are used in hooks - moved before useEffect to fix initialization order
+  const fetchSocialEntries = useCallback(async (useCache = true) => {
+    // Use a ref to prevent multiple simultaneous requests without depending on loading state
+    if (loadingRef.current) {
+      console.log('Social: Skipping fetch - already loading');
+      return;
+    }
+    
+    loadingRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const cacheHeader = useCache ? {} : { 'Cache-Control': 'no-cache' };
+      const headers = { ...cacheHeader };
+      
+      // Add authorization if available to get user's like status
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
+      const res = await fetch('/api/social?page=1&limit=20', {
+        headers,
+        credentials: 'include' // Include cookies for authentication
+      });
+      if (!res.ok) throw new Error('Failed to fetch social entries');
+      const data = await res.json();
+      const socialEntries = data.entries || data;
+      setEntries(socialEntries);
+      
+      // Extract user likes from the response if available
+      if (socialEntries.length > 0) {
+        const newUserLikes = new Set();
+        socialEntries.forEach(entry => {
+          if (entry.user_liked) {
+            newUserLikes.add(entry.id);
+          }
+        });
+        setUserLikes(newUserLikes);
+      }
+      
+      // Preserve expansion state for existing entries and reset for new ones
+      setExpandedEntries(prev => {
+        const newExpanded = new Set();
+        prev.forEach(entryId => {
+          // Only keep expanded state if the entry still exists
+          if (socialEntries.some(entry => entry.id === entryId)) {
+            newExpanded.add(entryId);
+          }
+        });
+        return newExpanded;
+      });
+      
+    } catch (err) {
+      setError('Could not load social entries.');
+      console.error(err);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // Remove loading dependency to prevent infinite loops
+
+  const handleShowComments = useCallback(async (entryId) => {
+    setCommentDialogs(prev => ({
+      ...prev,
+      [entryId]: !prev[entryId]
+    }));
+
+    // Fetch comments if not already loaded and dialog is being opened
+    const isOpening = !commentDialogs[entryId];
+    if (isOpening && !comments[entryId]) {
+      try {
+        const res = await fetch(`/api/comments?entryId=${entryId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setComments(prev => ({
+            ...prev,
+            [entryId]: data
+          }));
+        }
+      } catch (error) {
+        console.error('Comments fetch error:', error);
+      }
+    }
+  }, [commentDialogs, comments]); // Keep necessary dependencies but optimize logic
+
+  // Function to toggle entry expansion
+  const toggleEntryExpansion = useCallback((entryId) => {
+    setExpandedEntries(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(entryId)) {
+        newExpanded.delete(entryId);
+      } else {
+        newExpanded.add(entryId);
+      }
+      return newExpanded;
+    });
+  }, []);
+
+  // Helper function to detect if text contains HTML (rich text)
+  const isRichText = useCallback((text) => {
+    if (!text) return false;
+    // Check if text contains HTML tags
+    return /<[^>]+>/.test(text);
+  }, []);
+
+  // Helper function to truncate text to first 3 lines
+  const getTruncatedText = useCallback((text) => {
+    if (!text) return '';
+    
+    const isRich = isRichText(text);
+    
+    if (isRich) {
+      // For rich text, we need to preserve formatting while truncating
+      // The content structure is: <span style="color: rgb(255, 0, 0);">hehe</span><div>i love this</div><div>this is good</div><div>can i use this too</div><div>yeah this is good</div>
+      
+      // Strategy: Split by <div> tags but preserve inline formatting in the first part
+      const parts = text.split(/<div[^>]*>/i);
+      
+      if (parts.length <= 1) {
+        // No div tags, treat as single line
+        return text;
+      }
+      
+      // First part might contain inline elements (like the span)
+      let firstPart = parts[0];
+      
+      // Take next 2 parts (to make total 3 lines)
+      const nextParts = parts.slice(1, 3);
+      
+      // Reconstruct with div tags for the additional parts
+      let result = firstPart;
+      
+      nextParts.forEach(part => {
+        // Remove closing </div> if present and add opening <div>
+        const cleanPart = part.replace(/<\/div>.*$/, '');
+        if (cleanPart.trim()) {
+          result += '<div>' + cleanPart + '</div>';
+        }
+      });
+      
+      return result;
+    } else {
+      // For plain text, split by newlines and take first 3 lines
+      const lines = text.split('\n');
+      
+      if (lines.length <= 3) return text;
+      return lines.slice(0, 3).join('\n');
+    }
+  }, [isRichText]);
+
+  // Helper function to check if text needs truncation
+  const needsTruncation = useCallback((text) => {
+    if (!text) return false;
+    
+    const isRich = isRichText(text);
+    
+    if (isRich) {
+      // For rich text, convert HTML line breaks to newlines first
+      const htmlWithNewlines = text
+        .replace(/<br\s*\/?>/gi, '\n')           // <br> tags to \n
+        .replace(/<\/div>/gi, '\n')              // </div> to \n
+        .replace(/<\/p>/gi, '\n')                // </p> to \n
+        .replace(/<div[^>]*>/gi, '\n')           // <div> to \n
+        .replace(/<p[^>]*>/gi, '\n');            // <p> to \n
+      
+      // Strip HTML tags to get plain text
+      const plainText = htmlWithNewlines.replace(/<[^>]*>/g, '')
+                                        .replace(/&nbsp;/g, ' ')
+                                        .replace(/&lt;/g, '<')
+                                        .replace(/&gt;/g, '>')
+                                        .replace(/&amp;/g, '&');
+      
+      // Count non-empty lines
+      const lines = plainText.split('\n').filter(line => line.trim() !== '');
+      return lines.length > 3;
+    } else {
+      // For plain text, count newlines
+      const lines = text.split('\n');
+      return lines.length > 3;
+    }
+  }, [isRichText]);
+
+  // Cross-tab synchronization for social entries
   useEffect(() => {
     let refreshTimeout = null;
     let pendingUpdates = new Set();
@@ -103,7 +290,7 @@ export default function SocialPage() {
             // Immediate removal for deletes (no batching needed)
             setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId));
           } else if (type === 'ENTRY_CREATED' || type === 'ENTRY_UPDATED') {
-            console.log('Social: Received update notification from another tab');
+            console.log('Social: Received update notification from another tab:', { type, entryId });
             // Batch these updates
             pendingUpdates.add(`${type}_${entryId || 'all'}`);
             try {
@@ -113,13 +300,26 @@ export default function SocialPage() {
             }
           } else if (type === 'SOCIAL_LIKE_TOGGLED' && entryId) {
             console.log('Social: Received like toggle notification:', entryId);
-            // If we have the new count, update directly instead of refreshing
+            // If we have the new count and like status, update directly instead of refreshing
             if (event.data.newCount !== undefined) {
               setEntries(prevEntries => prevEntries.map(entry => 
                 entry.id === entryId 
                   ? { ...entry, likes_count: event.data.newCount }
                   : entry
               ));
+              
+              // Update user's like status if provided
+              if (event.data.liked !== undefined) {
+                setUserLikes(prev => {
+                  const newLikes = new Set(prev);
+                  if (event.data.liked) {
+                    newLikes.add(entryId);
+                  } else {
+                    newLikes.delete(entryId);
+                  }
+                  return newLikes;
+                });
+              }
             } else {
               // Fallback to batched refresh if no count provided
               pendingUpdates.add(`LIKE_${entryId}`);
@@ -181,6 +381,19 @@ export default function SocialPage() {
                   ? { ...entry, likes_count: action.newCount }
                   : entry
               ));
+              
+              // Update user's like status if provided
+              if (action.liked !== undefined) {
+                setUserLikes(prev => {
+                  const newLikes = new Set(prev);
+                  if (action.liked) {
+                    newLikes.add(entryId);
+                  } else {
+                    newLikes.delete(entryId);
+                  }
+                  return newLikes;
+                });
+              }
             } else {
               // Fallback to batched refresh
               pendingUpdates.add(`${type}_${entryId || 'all'}`);
@@ -211,65 +424,14 @@ export default function SocialPage() {
     };
   }, [commentDialogs, fetchSocialEntries, handleShowComments]); // Dependencies for the cross-tab sync
 
-  // Function definitions that are used in hooks
-  const fetchSocialEntries = useCallback(async (useCache = true) => {
-    // Prevent multiple simultaneous requests
-    if (loading) {
-      console.log('Social: Skipping fetch - already loading');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const cacheHeader = useCache ? {} : { 'Cache-Control': 'no-cache' };
-      const res = await fetch('/api/social?page=1&limit=20', {
-        headers: {
-          ...cacheHeader
-        }
-      });
-      if (!res.ok) throw new Error('Failed to fetch social entries');
-      const data = await res.json();
-      setEntries(data.entries || data); // Support both old and new format
-    } catch (err) {
-      setError('Could not load social entries.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading]);
-
-  const handleShowComments = useCallback(async (entryId) => {
-    setCommentDialogs(prev => ({
-      ...prev,
-      [entryId]: !prev[entryId]
-    }));
-
-    // Fetch comments if not already loaded
-    if (!comments[entryId]) {
-      try {
-        const res = await fetch(`/api/comments?entryId=${entryId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setComments(prev => ({
-            ...prev,
-            [entryId]: data
-          }));
-        }
-      } catch (error) {
-        console.error('Comments fetch error:', error);
-      }
-    }
-  }, [comments]);
-
   // Load entries immediately if we have a token, don't wait for full auth check
   useEffect(() => {
-    if (token || (!authLoading && isAuthenticated)) {
+    if (mounted && (token || (!authLoading && isAuthenticated))) {
       fetchSocialEntries().catch(error => {
         console.error('Social: Error in initial load:', error);
       });
     }
-  }, [token, isAuthenticated, authLoading, fetchSocialEntries]);
+  }, [mounted, token, isAuthenticated, authLoading, fetchSocialEntries]);
 
   // Separate effect for auth redirects to avoid blocking data loading
   useEffect(() => {
@@ -280,6 +442,9 @@ export default function SocialPage() {
 
   // Periodic refresh for social feed (every 45 seconds when tab is visible)
   useEffect(() => {
+    // Only set up interval if user is authenticated
+    if (!mounted || authLoading || !token && !isAuthenticated) return;
+    
     let lastUserActivity = Date.now();
     
     // Track user activity to avoid refreshing when user is actively interacting
@@ -314,10 +479,13 @@ export default function SocialPage() {
       window.removeEventListener('keydown', trackActivity);
       window.removeEventListener('scroll', trackActivity);
     };
-  }, [authLoading, token, isAuthenticated, fetchSocialEntries]);
+  }, [mounted, authLoading, token, isAuthenticated, fetchSocialEntries]);
 
   // Refresh on window focus and visibility change
   useEffect(() => {
+    // Only set up listeners if user is authenticated
+    if (!mounted || authLoading || !token && !isAuthenticated) return;
+    
     const handleFocus = () => {
       if (!authLoading && (token || isAuthenticated)) {
         fetchSocialEntries(false).catch(error => {
@@ -341,14 +509,18 @@ export default function SocialPage() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [authLoading, token, isAuthenticated, fetchSocialEntries]);
+  }, [mounted, authLoading, token, isAuthenticated, fetchSocialEntries]);
 
   const handleLike = async (entryId) => {
-    // Optimistic update - immediately update UI
+    // Check current like status
+    const isCurrentlyLiked = userLikes.has(entryId);
     const currentEntry = entries.find(entry => entry.id === entryId);
     if (!currentEntry) return;
     
-    const optimisticLikeCount = (currentEntry.likes_count || 0) + 1;
+    // Optimistic update - immediately update UI
+    const optimisticLikeCount = isCurrentlyLiked 
+      ? Math.max(0, (currentEntry.likes_count || 0) - 1)
+      : (currentEntry.likes_count || 0) + 1;
     
     // Update UI immediately for better user experience
     setEntries(prev => prev.map(entry => 
@@ -356,6 +528,17 @@ export default function SocialPage() {
         ? { ...entry, likes_count: optimisticLikeCount }
         : entry
     ));
+    
+    // Update user's like status optimistically
+    setUserLikes(prev => {
+      const newLikes = new Set(prev);
+      if (isCurrentlyLiked) {
+        newLikes.delete(entryId);
+      } else {
+        newLikes.add(entryId);
+      }
+      return newLikes;
+    });
 
     try {
       const res = await fetch('/api/social', {
@@ -364,6 +547,7 @@ export default function SocialPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
+        credentials: 'include',
         body: JSON.stringify({
           entryId,
           action: 'toggle_like'
@@ -379,6 +563,17 @@ export default function SocialPage() {
             ? { ...entry, likes_count: data.likes_count }
             : entry
         ));
+        
+        // Update user's like status with server response
+        setUserLikes(prev => {
+          const newLikes = new Set(prev);
+          if (data.liked) {
+            newLikes.add(entryId);
+          } else {
+            newLikes.delete(entryId);
+          }
+          return newLikes;
+        });
 
         // Only broadcast if the like count actually changed (avoid spam)
         if (data.likes_count !== currentEntry.likes_count) {
@@ -396,6 +591,7 @@ export default function SocialPage() {
                 type: 'SOCIAL_LIKE_TOGGLED', 
                 entryId: entryId,
                 newCount: data.likes_count,
+                liked: data.liked,
                 timestamp: now 
               });
               channel.close();
@@ -406,26 +602,45 @@ export default function SocialPage() {
               type: 'SOCIAL_LIKE_TOGGLED',
               entryId: entryId,
               newCount: data.likes_count,
+              liked: data.liked,
               timestamp: now
             }));
           }
         }
       } else {
-        // Revert optimistic update on error
+        // Revert optimistic updates on error
         setEntries(prev => prev.map(entry => 
           entry.id === entryId 
             ? { ...entry, likes_count: currentEntry.likes_count }
             : entry
         ));
+        setUserLikes(prev => {
+          const newLikes = new Set(prev);
+          if (isCurrentlyLiked) {
+            newLikes.add(entryId);
+          } else {
+            newLikes.delete(entryId);
+          }
+          return newLikes;
+        });
       }
     } catch (error) {
       console.error('Like error:', error);
-      // Revert optimistic update on error
+      // Revert optimistic updates on error
       setEntries(prev => prev.map(entry => 
         entry.id === entryId 
           ? { ...entry, likes_count: currentEntry.likes_count }
           : entry
       ));
+      setUserLikes(prev => {
+        const newLikes = new Set(prev);
+        if (isCurrentlyLiked) {
+          newLikes.add(entryId);
+        } else {
+          newLikes.delete(entryId);
+        }
+        return newLikes;
+      });
     }
   };
 
@@ -625,15 +840,39 @@ export default function SocialPage() {
                 </div>
 
                 {/* Entry Content */}
-                <div className="mb-3 sm:mb-4 p-3 sm:p-4 rounded transition-colors duration-300"
-                     style={{ backgroundColor: 'var(--entries-text-bg)', color: 'var(--entries-text)' }}>
+                <div className="mb-3 sm:mb-4">
                   <div 
-                    className="whitespace-pre-wrap prose prose-xs sm:prose-sm max-w-none text-sm sm:text-base leading-relaxed"
-                    style={{ color: 'var(--entries-text)' }}
-                    dangerouslySetInnerHTML={{ 
-                      __html: entry.is_rich_text ? (entry.text || 'Empty entry') : entry.text || 'Empty entry'
-                    }}
-                  />
+                    className={`p-3 sm:p-4 rounded transition-all duration-300 ${
+                      needsTruncation(entry.text, entry.is_rich_text) 
+                        ? 'cursor-pointer hover:opacity-90 hover:shadow-sm' 
+                        : ''
+                    }`}
+                    style={{ backgroundColor: 'var(--entries-text-bg)', color: 'var(--entries-text)' }}
+                    onClick={() => needsTruncation(entry.text) && toggleEntryExpansion(entry.id)}
+                  >
+                    <div 
+                      className="whitespace-pre-wrap prose prose-xs sm:prose-sm max-w-none text-sm sm:text-base leading-relaxed"
+                      style={{ color: 'var(--entries-text)' }}
+                      dangerouslySetInnerHTML={{ 
+                        __html: expandedEntries.has(entry.id) 
+                          ? (entry.text || 'Empty entry')
+                          : getTruncatedText(entry.text || 'Empty entry')
+                      }}
+                    />
+                    {needsTruncation(entry.text) && (
+                      <div 
+                        className="mt-2 text-xs sm:text-sm font-medium transition-colors duration-300 flex items-center gap-1"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        <span>
+                          {expandedEntries.has(entry.id) ? 'Show less' : 'Show more'}
+                        </span>
+                        <span className="text-xs">
+                          {expandedEntries.has(entry.id) ? '▲' : '▼'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -642,7 +881,9 @@ export default function SocialPage() {
                     onClick={() => handleLike(entry.id)}
                     className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
-                    <span className="text-red-500 text-base sm:text-lg">❤️</span>
+                    <span className={`text-base sm:text-lg ${userLikes.has(entry.id) ? 'text-red-500' : 'text-gray-400'}`}>
+                      {userLikes.has(entry.id) ? '❤️' : '🤍'}
+                    </span>
                     <span className="text-xs sm:text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                       {entry.likes_count || 0}
                     </span>

@@ -491,17 +491,41 @@ export default function MainContent() {
                     backgroundColor: 'var(--entries-text-bg)',
                     color: 'var(--entries-text)'
                   }}
-                >
-                  {(() => {
-                    // Strip HTML tags and get plain text
-                    const plainText = stripHtmlTags(entry.text || '');
-                    const firstLine = plainText.split('\n')[0];
-                    if (firstLine.length > 30) {
-                      return firstLine.slice(0, 30) + '...';
-                    }
-                    return firstLine || 'Empty entry';
-                  })()}
-                </div>
+                  dangerouslySetInnerHTML={{
+                    __html: (() => {
+                      // Convert HTML line breaks to newlines first, then strip HTML
+                      const htmlWithNewlines = (entry.text || '')
+                        .replace(/<br\s*\/?>/gi, '\n')           // <br> tags to \n
+                        .replace(/<\/div>/gi, '\n')              // </div> to \n
+                        .replace(/<\/p>/gi, '\n')                // </p> to \n
+                        .replace(/<div[^>]*>/gi, '\n')           // <div> to \n
+                        .replace(/<p[^>]*>/gi, '\n');            // <p> to \n
+                      
+                      // Now strip remaining HTML tags and clean up
+                      const plainText = stripHtmlTags(htmlWithNewlines).trim();
+                      
+                      // Get first line only
+                      const lines = plainText.split('\n');
+                      const firstLine = lines[0].trim();
+                      
+                      // Take only first 50 characters of the first line
+                      let result;
+                      if (firstLine.length > 50) {
+                        // First line is too long, truncate it
+                        result = firstLine.slice(0, 50) + '...';
+                      } else if (lines.length > 1 || (lines.length === 1 && plainText.trim() !== firstLine.trim())) {
+                        // There are more lines or more content, add ... to indicate more
+                        result = firstLine + '...';
+                      } else {
+                        // Only one line and it fits
+                        result = firstLine || 'Empty entry';
+                      }
+                      
+                      // Convert any remaining \n back to <br> for HTML display (though there shouldn't be any after taking first line)
+                      return result.replace(/\n/g, '<br>');
+                    })()
+                  }}
+                />
               </div>
             ))
           )}

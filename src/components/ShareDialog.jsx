@@ -30,6 +30,24 @@ export default function ShareDialog({ isOpen, onClose, entry, onSave }) {
       });
 
       if (response.ok) {
+        // Broadcast the sharing change to other tabs (like social feed)
+        if (window.BroadcastChannel) {
+          const channel = new BroadcastChannel('diary-updates');
+          channel.postMessage({ 
+            type: 'ENTRY_UPDATED', 
+            entryId: entry?.id,
+            timestamp: Date.now() 
+          });
+          channel.close();
+        }
+
+        // Also use localStorage as fallback
+        localStorage.setItem('diary-last-action', JSON.stringify({
+          type: 'ENTRY_UPDATED',
+          entryId: entry?.id,
+          timestamp: Date.now()
+        }));
+
         // Call onSave callback if provided to refresh the parent component
         if (onSave) {
           onSave();
