@@ -6,8 +6,12 @@ export default function NewEntryButton() {
   const router = useRouter();
   return (
     <button
-      onClick={() => router.push('/new')}
-      className="fixed bottom-6 right-6 bg-[#b3e6fa] shadow-lg rounded-full px-6 py-3 flex items-center text-lg font-bold hover:bg-[#a0d8ef] transition-colors"
+      onClick={() => router.push('/entries/new')}
+      className="fixed bottom-6 right-6 shadow-lg rounded-full px-6 py-3 flex items-center text-lg font-bold hover:opacity-90 transition-all duration-300"
+      style={{ 
+        backgroundColor: 'var(--new-button-bg)',
+        color: 'var(--new-button-text)'
+      }}
     >
       <span className="mr-2 text-2xl">+</span> NEW
     </button>
