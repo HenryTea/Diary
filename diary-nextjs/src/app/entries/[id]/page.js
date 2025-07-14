@@ -218,6 +218,25 @@ export default function Page() {
           if (validateEntryId(newEntry.id)) {
             window.history.replaceState(null, '', `/entries/${newEntry.id}`);
           }
+
+          // Broadcast entry creation to other tabs
+          if (window.BroadcastChannel) {
+            const channel = new BroadcastChannel('diary-updates');
+            channel.postMessage({ 
+              type: 'ENTRY_CREATED', 
+              entryId: newEntry.id,
+              timestamp: Date.now() 
+            });
+            channel.close();
+          }
+
+          // Also use localStorage as fallback
+          localStorage.setItem('diary-last-action', JSON.stringify({
+            type: 'ENTRY_CREATED',
+            entryId: newEntry.id,
+            timestamp: Date.now()
+          }));
+
         } else {
           const error = await res.text();
           console.error('Failed to create entry:', error);
@@ -252,6 +271,25 @@ export default function Page() {
           setEntry((prev) => (prev ? { ...prev, text: sanitizedHtml } : prev));
           setOriginalHtml(sanitizedHtml);
           setIsDirty(false);
+
+          // Broadcast entry update to other tabs
+          if (window.BroadcastChannel) {
+            const channel = new BroadcastChannel('diary-updates');
+            channel.postMessage({ 
+              type: 'ENTRY_UPDATED', 
+              entryId: id,
+              timestamp: Date.now() 
+            });
+            channel.close();
+          }
+
+          // Also use localStorage as fallback
+          localStorage.setItem('diary-last-action', JSON.stringify({
+            type: 'ENTRY_UPDATED',
+            entryId: id,
+            timestamp: Date.now()
+          }));
+
         } else {
           const error = await res.text();
           console.error('Failed to update entry:', error);

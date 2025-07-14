@@ -12,6 +12,7 @@
     "test:security": "node test/test-security.js"
   },
   "dependencies": {
+    "autoprefixer": "^10.4.21",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.0.0",
     "htmldiff-js": "^1.0.5",

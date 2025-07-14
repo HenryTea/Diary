@@ -159,20 +159,56 @@ export default function MainContent() {
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
-      const headers = {
-        "Content-Type": "application/json",
-      };
-      
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
+      try {
+        // Optimistically remove the entry from local state first
+        setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
+        
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        
+        const response = await fetch("/api/entries", {
+          method: "DELETE",
+          headers,
+          body: JSON.stringify({ id }),
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete entry');
+        }
+
+        // Broadcast deletion to other tabs
+        if (window.BroadcastChannel) {
+          const channel = new BroadcastChannel('diary-updates');
+          channel.postMessage({ 
+            type: 'ENTRY_DELETED', 
+            entryId: id,
+            timestamp: Date.now() 
+          });
+          channel.close();
+        }
+
+        // Also use localStorage as fallback for older browsers
+        localStorage.setItem('diary-last-action', JSON.stringify({
+          type: 'ENTRY_DELETED',
+          entryId: id,
+          timestamp: Date.now()
+        }));
+
+        // Refresh to ensure consistency
+        fetchEntries(false);
+        
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        // If delete failed, refresh to restore the entry in the UI
+        fetchEntries(false);
+        alert('Failed to delete entry. Please try again.');
       }
-      
-      await fetch("/api/entries", {
-        method: "DELETE",
-        headers,
-        body: JSON.stringify({ id }),
-      });
-      fetchEntries();
     }
   };
 
@@ -230,6 +266,72 @@ export default function MainContent() {
     // Refresh entries after sharing settings change
     fetchEntries();
   };
+
+  // Cross-tab synchronization using BroadcastChannel and localStorage
+  useEffect(() => {
+    // BroadcastChannel for modern browsers
+    let channel;
+    if (window.BroadcastChannel) {
+      channel = new BroadcastChannel('diary-updates');
+      channel.onmessage = (event) => {
+        const { type, entryId, timestamp } = event.data;
+        
+        if (type === 'ENTRY_DELETED' && entryId) {
+          console.log('Received delete notification from another tab:', entryId);
+          // Remove the entry from local state
+          setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId));
+        } else if (type === 'ENTRY_CREATED' || type === 'ENTRY_UPDATED') {
+          console.log('Received update notification from another tab');
+          // Refresh entries to get the latest data
+          fetchEntries(false);
+        }
+      };
+    }
+
+    // localStorage fallback for older browsers
+    const handleStorageChange = (event) => {
+      if (event.key === 'diary-last-action' && event.newValue) {
+        try {
+          const action = JSON.parse(event.newValue);
+          const { type, entryId, timestamp } = action;
+          
+          // Avoid processing our own actions (same timestamp within 1 second)
+          if (Math.abs(Date.now() - timestamp) < 1000) return;
+          
+          if (type === 'ENTRY_DELETED' && entryId) {
+            console.log('Received delete notification via localStorage:', entryId);
+            setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId));
+          } else if (type === 'ENTRY_CREATED' || type === 'ENTRY_UPDATED') {
+            console.log('Received update notification via localStorage');
+            fetchEntries(false);
+          }
+        } catch (error) {
+          console.error('Error parsing localStorage diary action:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup
+    return () => {
+      if (channel) {
+        channel.close();
+      }
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Periodic refresh as backup (every 30 seconds when tab is visible)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (!document.hidden && !authLoading) {
+        fetchEntries(false);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [authLoading]);
 
   return (
     <main className="pt-24 px-8 mx-auto min-h-screen transition-colors duration-300" 
