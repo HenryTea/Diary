@@ -13,9 +13,9 @@ export const sanitizeHtml = (dirty) => {
       'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'span', 'div', 'h1', 'h2', 'h3', 
       'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'a', 'sub', 'sup'
     ],
-    ALLOWED_ATTR: ['style', 'class', 'href', 'target', 'rel'],
+    ALLOWED_ATTR: ['style', 'class', 'href', 'target', 'rel', 'data-username', 'contenteditable'],
     ALLOWED_SCHEMES: ['http', 'https', 'mailto'],
-    ALLOW_DATA_ATTR: false,
+    ALLOW_DATA_ATTR: ['data-username'], // Allow data-username for mentions
     FORBID_SCRIPT: true,
     FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'iframe', 'meta'],
     STRIP_COMMENTS: true,
@@ -23,7 +23,21 @@ export const sanitizeHtml = (dirty) => {
     WHOLE_DOCUMENT: false,
     RETURN_DOM: false,
     RETURN_DOM_FRAGMENT: false,
-    RETURN_TRUSTED_TYPE: false
+    RETURN_TRUSTED_TYPE: false,
+    ADD_TAGS: [], // Don't add any additional tags
+    ADD_ATTR: [], // Don't add any additional attributes
+    HOOKS: {
+      // Custom hook to preserve user mentions
+      afterSanitizeAttributes: function(node) {
+        if (node.classList && node.classList.contains('user-mention')) {
+          // Preserve mention styling and make non-editable
+          node.style.color = '#3b82f6';
+          node.style.fontWeight = '500';
+          node.style.cursor = 'pointer';
+          node.contentEditable = false;
+        }
+      }
+    }
   });
 };
 
@@ -65,18 +79,30 @@ export const validateHtmlContent = (html) => {
   if (!html || typeof html !== 'string') return false;
   if (html.length > 2000000) return false; // 2MB limit
   
-  // Check for suspicious patterns
+  // Check for suspicious patterns (excluding safe mention patterns)
   const suspiciousPatterns = [
     /<script/i,
     /javascript:/i,
-    /on\w+\s*=/i,
+    /on\w+\s*=/i,  // Event handlers like onclick, onload, etc.
     /<iframe/i,
     /<object/i,
     /<embed/i,
     /<form/i
   ];
   
-  return !suspiciousPatterns.some(pattern => pattern.test(html));
+  // Create a copy of HTML to check after removing safe mention elements
+  let htmlToCheck = html;
+  
+  // Remove safe mention spans before checking
+  // Pattern: <span class="user-mention" data-username="..." contenteditable="false" style="...">@username</span>
+  const mentionPattern = /<span[^>]*class=["']user-mention["'][^>]*data-username=["'][^"']*["'][^>]*>@[^<]+<\/span>/gi;
+  htmlToCheck = htmlToCheck.replace(mentionPattern, '');
+  
+  // Also remove safe data-username attributes in general
+  htmlToCheck = htmlToCheck.replace(/data-username=["'][^"']*["']/gi, '');
+  
+  // Now check for suspicious patterns in the cleaned HTML
+  return !suspiciousPatterns.some(pattern => pattern.test(htmlToCheck));
 };
 
 /**

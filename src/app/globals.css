@@ -32,6 +32,7 @@
   --sidebar-hover: #e5e7eb;
   --new-button-bg: #b3e6fa;
   --new-button-text: #000000;
+  --mention-highlight-bg: rgba(59, 130, 246, 0.05);
 }
 
 /* Dark mode */
@@ -51,6 +52,7 @@
   --sidebar-hover: #374151;
   --new-button-bg: #374151;
   --new-button-text: #ffffff;
+  --mention-highlight-bg: rgba(96, 165, 250, 0.1);
 }
 
 html,
@@ -74,4 +76,54 @@ body {
 
 [data-theme="dark"] .share-icon {
   filter: brightness(0) saturate(100%) invert(88%) sepia(7%) saturate(209%) hue-rotate(175deg) brightness(97%) contrast(92%);
+}
+
+/* User mention styles */
+.user-mention {
+  color: #3b82f6 !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  border-radius: 3px;
+  padding: 1px 2px;
+  background-color: rgba(59, 130, 246, 0.1);
+  transition: background-color 0.2s ease;
+}
+
+.user-mention:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+  text-decoration: underline !important;
+}
+
+[data-theme="dark"] .user-mention {
+  color: #60a5fa !important;
+  background-color: rgba(96, 165, 250, 0.1);
+}
+
+[data-theme="dark"] .user-mention:hover {
+  background-color: rgba(96, 165, 250, 0.2);
+}
+
+/* Mention dropdown positioning */
+.mention-dropdown {
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.mention-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.mention-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mention-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+[data-theme="dark"] .mention-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
 }

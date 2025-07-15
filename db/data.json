@@ -39,6 +39,14 @@
       "password_hash": "$2b$10$/TiECzB7nPCMP0uuHxUujuTd1e1DxprD4wUMs4d3918lxUjAvWFyu",
       "created_at": "2025-07-14T18:14:04.523Z",
       "updated_at": "2025-07-14T18:14:04.523Z"
+    },
+    {
+      "id": "1752570944628qywzsspv4v",
+      "username": "Le",
+      "email": "Le@gmail.com",
+      "password_hash": "$2b$10$lITcmkfdjxsTvT2T1POp1OqY8A5YbiNWdcnLFPRdj3MLJr6BDVjFq",
+      "created_at": "2025-07-15T09:15:44.628Z",
+      "updated_at": "2025-07-15T09:15:44.628Z"
     }
   ],
   "entries": [
@@ -49,15 +57,6 @@
       "is_public": true,
       "created_at": "2025-07-14T18:33:22.523Z",
       "updated_at": "2025-07-15T02:58:24.518Z",
-      "is_shared": true
-    },
-    {
-      "id": "17525203706870vstvs7o2zi",
-      "user_id": "17524461069931x88umlwcsb",
-      "content": "i kinda love this too",
-      "is_public": true,
-      "created_at": "2025-07-14T19:12:50.687Z",
-      "updated_at": "2025-07-14T19:13:01.663Z",
       "is_shared": true
     },
     {
@@ -117,6 +116,24 @@
       "is_public": false,
       "created_at": "2025-07-15T00:43:15.909Z",
       "updated_at": "2025-07-15T00:43:15.909Z"
+    },
+    {
+      "id": "1752573953241dzh0owla1ew",
+      "user_id": "1752570944628qywzsspv4v",
+      "content": "<span style=\"color: rgb(255, 0, 255);\">lasjd<span style=\"font-family: &quot;Open Sans&quot;, sans-serif;\">fl;</span><u><span style=\"font-family: &quot;Open Sans&quot;, sans-serif;\">k</span><span style=\"color: rgb(0, 0, 0);\"><span style=\"font-family: &quot;Open Sans&quot;, sans-serif;\">ha</span><span style=\"font-size: 32px;\"><span style=\"font-family: &quot;Open Sans&quot;, sans-serif;\">s</span>dj</span></span><span style=\"font-size: 32px;\">f<span style=\"font-family: Montserrat, sans-serif;\">s<strong>aj</strong>df</span></span><span style=\"font-family: Montserrat, sans-serif;\">nslajdfp</span></u><span style=\"font-family: Montserrat, sans-serif;\">;</span></span><span style=\"font-family: Montserrat, sans-serif;\"></span><div><span style=\"color: rgb(255, 0, 255);\"><span style=\"font-family: Montserrat, sans-serif;\"><span contenteditable=\"false\" class=\"user-mention\" data-username=\"Hoang\" style=\"color: rgb(59, 130, 246); font-weight: 500; cursor: pointer;\">@Hoang</span> </span></span></div>",
+      "is_public": true,
+      "created_at": "2025-07-15T10:05:53.241Z",
+      "updated_at": "2025-07-15T11:11:37.204Z",
+      "is_shared": true
+    },
+    {
+      "id": "1752582487099byyjxj8s93m",
+      "user_id": "17524461069931x88umlwcsb",
+      "content": "hello <span style=\"font-family: Montserrat, sans-serif;\"><span style=\"color: rgb(255, 0, 0);\">friend of mine!!!\n<span contenteditable=\"false\" class=\"user-mention\" data-username=\"Le\" style=\"color: rgb(59, 130, 246); font-weight: 500; cursor: pointer;\">@Le</span> </span></span>",
+      "is_public": true,
+      "created_at": "2025-07-15T12:28:07.099Z",
+      "updated_at": "2025-07-15T12:28:17.873Z",
+      "is_shared": true
     }
   ],
   "likes": [
@@ -125,12 +142,6 @@
       "user_id": "17524461069931x88umlwcsb",
       "entry_id": "1752447146195wcth5wagqds",
       "created_at": "2025-07-13T23:13:47.154Z"
-    },
-    {
-      "id": "17525202186911h5zvazmxw5",
-      "user_id": "17524461069931x88umlwcsb",
-      "entry_id": "17525180025236lisjmgjkvg",
-      "created_at": "2025-07-14T19:10:18.692Z"
     },
     {
       "id": "1752531714977aoxsww5jjkm",
@@ -143,6 +154,24 @@
       "user_id": "17524461069931x88umlwcsb",
       "entry_id": "175253433292566t1iberyv9",
       "created_at": "2025-07-15T00:21:49.983Z"
+    },
+    {
+      "id": "1752571668602gukigtu8jk7",
+      "user_id": "17524461069931x88umlwcsb",
+      "entry_id": "17525180025236lisjmgjkvg",
+      "created_at": "2025-07-15T09:27:48.602Z"
+    },
+    {
+      "id": "1752573674102kjalmofkzpj",
+      "user_id": "1752570944628qywzsspv4v",
+      "entry_id": "175253433292566t1iberyv9",
+      "created_at": "2025-07-15T10:01:14.102Z"
+    },
+    {
+      "id": "1752582502528lw9dsf6znic",
+      "user_id": "17524461069931x88umlwcsb",
+      "entry_id": "1752582487099byyjxj8s93m",
+      "created_at": "2025-07-15T12:28:22.528Z"
     }
   ],
   "comments": [
@@ -163,6 +192,24 @@
       "comment_text": "love u",
       "created_at": "2025-07-14T22:22:00.381Z",
       "updated_at": "2025-07-14T22:22:00.381Z"
+    },
+    {
+      "id": "1752571690805dq54vz117v",
+      "user_id": "17524461069931x88umlwcsb",
+      "entry_id": "17525180025236lisjmgjkvg",
+      "content": "dcfvgbnjmk",
+      "comment_text": "dcfvgbnjmk",
+      "created_at": "2025-07-15T09:28:10.805Z",
+      "updated_at": "2025-07-15T09:28:10.805Z"
+    },
+    {
+      "id": "1752571979630r8dbygp94lj",
+      "user_id": "17524461069931x88umlwcsb",
+      "entry_id": "17525203706870vstvs7o2zi",
+      "content": "a",
+      "comment_text": "a",
+      "created_at": "2025-07-15T09:32:59.630Z",
+      "updated_at": "2025-07-15T09:32:59.630Z"
     }
   ]
 }

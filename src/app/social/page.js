@@ -17,6 +17,7 @@ export default function SocialPage() {
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [userLikes, setUserLikes] = useState(new Set()); // Track which entries the user has liked
   const [expandedEntries, setExpandedEntries] = useState(new Set()); // Track which entries are expanded
+  const [sortAsc, setSortAsc] = useState(false); // Track sort order for likes
   const { token, isAuthenticated, loading: authLoading, requiresAuth, user } = useAuth();
   const router = useRouter();
   
@@ -59,7 +60,10 @@ export default function SocialPage() {
     if (!hasToken && !hasUser && !authLoading) {
       console.log('No authentication found, redirecting to login immediately');
       setShouldRedirect(true);
-      router.replace('/login');
+      // Use setTimeout to avoid setState during render
+      setTimeout(() => {
+        router.replace('/login');
+      }, 0);
       return;
     }
     
@@ -67,7 +71,10 @@ export default function SocialPage() {
     if (!authLoading && requiresAuth) {
       console.log('Authentication required, redirecting to login');
       setShouldRedirect(true);
-      router.replace('/login');
+      // Use setTimeout to avoid setState during render
+      setTimeout(() => {
+        router.replace('/login');
+      }, 0);
       return;
     }
   }, [mounted, token, user, authLoading, requiresAuth, router]);
@@ -175,6 +182,21 @@ export default function SocialPage() {
     if (!text) return false;
     // Check if text contains HTML tags
     return /<[^>]+>/.test(text);
+  }, []);
+
+  // Helper function to check if current user is mentioned in the entry
+  const isUserMentioned = useCallback((entryText, currentUsername) => {
+    if (!entryText || !currentUsername) return false;
+    
+    // Check for mention spans with data-username attribute
+    const mentionPattern = new RegExp(`<span[^>]*class=["']user-mention["'][^>]*data-username=["']${currentUsername}["'][^>]*>@${currentUsername}</span>`, 'i');
+    if (mentionPattern.test(entryText)) {
+      return true;
+    }
+    
+    // Fallback: check for plain text mentions (for backward compatibility)
+    const plainMentionPattern = new RegExp(`@${currentUsername}\\b`, 'i');
+    return plainMentionPattern.test(entryText);
   }, []);
 
   // Helper function to truncate text to first 3 lines
@@ -436,7 +458,10 @@ export default function SocialPage() {
   // Separate effect for auth redirects to avoid blocking data loading
   useEffect(() => {
     if (!authLoading && requiresAuth) {
-      router.replace('/login');
+      // Use setTimeout to avoid setState during render
+      setTimeout(() => {
+        router.replace('/login');
+      }, 0);
     }
   }, [requiresAuth, authLoading, router]);
 
@@ -646,7 +671,10 @@ export default function SocialPage() {
 
   const handleAddComment = async (entryId) => {
     const comment = newComment[entryId];
-    if (!comment?.trim()) return;
+    if (!comment?.trim()) {
+      alert('Please enter a comment before submitting.');
+      return;
+    }
 
     try {
       const headers = {
@@ -743,7 +771,7 @@ export default function SocialPage() {
   
   if (!hasToken && !hasUser) {
     // This should rarely be hit due to the useEffect above, but provides safety
-    router.replace('/login');
+    // Don't call router.replace here - let the useEffect handle it
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ color: 'var(--text-primary)' }} className="text-sm sm:text-base text-center">Checking access...</div>
@@ -763,6 +791,29 @@ export default function SocialPage() {
       </div>
     );
   }
+
+  const handleSortByLikes = () => {
+    // Toggle sort order
+    const newSortAsc = !sortAsc;
+    setSortAsc(newSortAsc);
+    
+    // Sort entries by likes count
+    setEntries(prevEntries => {
+      const sortedEntries = [...prevEntries].sort((a, b) => {
+        const likesA = a.likes_count || 0;
+        const likesB = b.likes_count || 0;
+        
+        if (newSortAsc) {
+          return likesA - likesB; // Ascending order
+        } else {
+          return likesB - likesA; // Descending order
+        }
+      });
+      
+      return sortedEntries;
+    });
+  };
+
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -804,6 +855,27 @@ export default function SocialPage() {
             />
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+          <button 
+            onClick={handleSortByLikes}
+            title={sortAsc ? 'Sort by likes (descending)' : 'Sort by likes (ascending)'}
+            className='flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 hover:opacity-80 disabled:opacity-50 text-sm sm:text-base w-full sm:w-auto justify-center sm:justify-start'
+            style={{ 
+              backgroundColor: 'var(--new-button-bg)', 
+              color: 'var(--new-button-text)' 
+            }}
+          >
+            <Image
+              src={sortAsc ? "/icon/sort_like_ascending.svg" : "/icon/sort_like_descending.svg"}
+              alt={sortAsc ? "Sort Ascending" : "Sort Descending"}
+              width={16}
+              height={16}
+              className="w-3 h-3 sm:w-4 sm:h-4"
+              style={{ 
+                filter: 'var(--icon-filter)' 
+              }}
+            />
+            Sort by Likes
+          </button>
         </div>
 
         <div className="flex flex-col gap-4 sm:gap-6">
@@ -812,11 +884,27 @@ export default function SocialPage() {
               <p className="text-sm sm:text-base">No shared entries yet.</p>
             </div>
           ) : (
-            entries.map(entry => (
+            entries.map(entry => {
+              // Check if current user is mentioned in this entry
+              const currentUsername = user?.username;
+              const isMentioned = isUserMentioned(entry.text, currentUsername);
+              
+              return (
               <div
                 key={entry.id}
-                className="rounded-lg p-4 sm:p-6 transition-all duration-300"
-                style={{ backgroundColor: 'var(--entries-bg)' }}
+                className={`rounded-lg p-4 sm:p-6 transition-all duration-300 ${
+                  isMentioned 
+                    ? 'ring-2 ring-blue-400 ring-opacity-50 shadow-lg' 
+                    : ''
+                }`}
+                style={{ 
+                  backgroundColor: isMentioned 
+                    ? 'var(--mention-highlight-bg, var(--entries-bg))' 
+                    : 'var(--entries-bg)',
+                  borderLeft: isMentioned 
+                    ? '4px solid #3b82f6' 
+                    : 'none'
+                }}
               >
                 {/* User Info */}
                 <div className="flex items-center mb-3 sm:mb-4">
@@ -825,9 +913,19 @@ export default function SocialPage() {
                     {entry.username?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm sm:text-base transition-colors duration-300 truncate" 
-                         style={{ color: 'var(--text-primary)' }}>
-                      {entry.username}
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold text-sm sm:text-base transition-colors duration-300 truncate" 
+                           style={{ color: 'var(--text-primary)' }}>
+                        {entry.username}
+                      </div>
+                      {isMentioned && (
+                        <span 
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          title="You are mentioned in this post"
+                        >
+                          @
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs sm:text-sm transition-colors duration-300" 
                          style={{ color: 'var(--text-secondary)' }}>
@@ -963,7 +1061,8 @@ export default function SocialPage() {
                   </div>
                 )}
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </div>

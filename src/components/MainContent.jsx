@@ -52,16 +52,15 @@ export default function MainContent() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token]); // Only depend on token, user.id will be handled by cookies
 
-  // Fetch entries when authentication is ready (either token-based or cookie-based)
+  // Fetch entries when authentication is ready OR when user changes
   useEffect(() => {
     if (!authLoading) {
-      // Fetch entries regardless of authentication method
-      // The API will handle both authenticated and non-authenticated requests
-      fetchEntries();
+      console.log('Fetching entries for user:', user?.id || 'no user');
+      fetchEntries(false); // Always force refresh to get correct user data
     }
-  }, [authLoading, fetchEntries]);
+  }, [authLoading, user?.id, fetchEntries]); // Depend on authLoading, user.id, and fetchEntries
 
   // Refetch entries when the window gets focus (user returns from editor)
   useEffect(() => {

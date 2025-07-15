@@ -78,9 +78,31 @@ export default function Page() {
   const [showSocialUpdateDialog, setShowSocialUpdateDialog] = useState(false);
   const [pendingSaveData, setPendingSaveData] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // User mention/tagging state
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionSuggestions, setMentionSuggestions] = useState([]);
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+  const [mentionRange, setMentionRange] = useState(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
   // Rich text editor hook
   const editor = useRichTextEditor(entry, originalHtml, setOriginalHtml, setIsDirty);
+  
+  // Process existing mentions when entry is loaded
+  useEffect(() => {
+    if (entry && editor.editorRef.current) {
+      // Find all existing mentions in the content and ensure they have proper styling
+      const mentions = editor.editorRef.current.querySelectorAll('.user-mention');
+      mentions.forEach(mention => {
+        mention.style.color = '#3b82f6';
+        mention.style.fontWeight = '500';
+        mention.style.cursor = 'pointer';
+        mention.contentEditable = false;
+      });
+    }
+  }, [entry, editor.editorRef]);
 
   // Update current time every second
   useEffect(() => {
@@ -90,6 +112,174 @@ export default function Page() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Function to fetch user suggestions for mentions
+  const fetchUserSuggestions = useCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setMentionSuggestions([]);
+      return;
+    }
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+        headers,
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        const users = await res.json();
+        setMentionSuggestions(users.slice(0, 5)); // Limit to 5 suggestions
+        setSelectedMentionIndex(0);
+      } else {
+        console.error('User search failed:', res.status, await res.text());
+        setMentionSuggestions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching user suggestions:', error);
+      setMentionSuggestions([]);
+    }
+  }, [token]);
+
+  // Debounced version of fetchUserSuggestions
+  const debouncedFetchUserSuggestions = useCallback(
+    useMemo(() => {
+      let timeoutId;
+      return (query) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          fetchUserSuggestions(query);
+        }, 300); // 300ms debounce delay
+      };
+    }, [fetchUserSuggestions]),
+    [fetchUserSuggestions]
+  );
+
+  // Function to handle mention insertion
+  const insertMention = useCallback((username) => {
+    if (!mentionRange || !editor.editorRef.current) return;
+
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(mentionRange);
+
+    // Create mention element with blue styling
+    const mentionElement = document.createElement('span');
+    mentionElement.contentEditable = false;
+    mentionElement.style.color = '#3b82f6'; // Blue color
+    mentionElement.style.fontWeight = '500';
+    mentionElement.style.cursor = 'pointer';
+    mentionElement.className = 'user-mention';
+    mentionElement.setAttribute('data-username', username);
+    mentionElement.textContent = `@${username}`;
+
+    // Delete the @ and query text
+    mentionRange.deleteContents();
+    
+    // Insert the mention element
+    mentionRange.insertNode(mentionElement);
+    
+    // Add a space after the mention
+    const space = document.createTextNode(' ');
+    mentionRange.setStartAfter(mentionElement);
+    mentionRange.insertNode(space);
+    
+    // Position cursor after the space
+    mentionRange.setStartAfter(space);
+    mentionRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(mentionRange);
+
+    // Hide dropdown
+    setShowMentionDropdown(false);
+    setMentionQuery('');
+    setMentionRange(null);
+
+    // Trigger change event
+    editor.handleHtmlChange({ target: editor.editorRef.current });
+  }, [mentionRange, editor]);
+
+  // Function to get cursor position for dropdown placement
+  const getCursorPosition = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return { top: 0, left: 0 };
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const editorRect = editor.editorRef.current?.getBoundingClientRect();
+    
+    if (!editorRect) return { top: 0, left: 0 };
+
+    return {
+      top: rect.bottom - editorRect.top + 5,
+      left: rect.left - editorRect.left
+    };
+  }, [editor]);
+
+  // Function to handle mention detection and dropdown
+  const handleMentionDetection = useCallback((target) => {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const textNode = range.startContainer;
+    
+    if (textNode.nodeType !== Node.TEXT_NODE) {
+      setShowMentionDropdown(false);
+      return;
+    }
+
+    const text = textNode.textContent;
+    const cursorPosition = range.startOffset;
+    
+    // Find the last @ before cursor
+    let atIndex = -1;
+    for (let i = cursorPosition - 1; i >= 0; i--) {
+      if (text[i] === '@') {
+        // Check if @ is at start or preceded by whitespace
+        if (i === 0 || /\s/.test(text[i - 1])) {
+          atIndex = i;
+          break;
+        }
+      } else if (/\s/.test(text[i])) {
+        // Stop at whitespace
+        break;
+      }
+    }
+
+    if (atIndex !== -1) {
+      // Extract query after @
+      const query = text.substring(atIndex + 1, cursorPosition);
+      
+      // Only show if query doesn't contain spaces and is reasonable length
+      if (!/\s/.test(query) && query.length <= 20) {
+        setMentionQuery(query);
+        
+        // Create range for the mention (@ + query)
+        const mentionRange = document.createRange();
+        mentionRange.setStart(textNode, atIndex);
+        mentionRange.setEnd(textNode, cursorPosition);
+        setMentionRange(mentionRange);
+        
+        // Get position for dropdown
+        const position = getCursorPosition();
+        setMentionPosition(position);
+        
+        setShowMentionDropdown(true);
+        debouncedFetchUserSuggestions(query);
+        return;
+      }
+    }
+
+    setShowMentionDropdown(false);
+  }, [getCursorPosition, fetchUserSuggestions]);
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -608,6 +798,9 @@ export default function Page() {
             }
             
             editor.handleHtmlChange(e);
+            
+            // Handle mention detection
+            handleMentionDetection(e.target);
           }}
           onPaste={(e) => {
             // Security: Sanitize pasted content
@@ -630,9 +823,40 @@ export default function Page() {
             editor.handleHtmlChange({ target: e.target });
           }}
           onKeyDown={(e) => {
+            // Handle mention dropdown navigation
+            if (showMentionDropdown && mentionSuggestions.length > 0) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedMentionIndex(prev => 
+                  prev < mentionSuggestions.length - 1 ? prev + 1 : 0
+                );
+                return;
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedMentionIndex(prev => 
+                  prev > 0 ? prev - 1 : mentionSuggestions.length - 1
+                );
+                return;
+              } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if (mentionSuggestions[selectedMentionIndex]) {
+                  insertMention(mentionSuggestions[selectedMentionIndex].username);
+                }
+                return;
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setShowMentionDropdown(false);
+                return;
+              }
+            }
+
             // Clear selection on cursor movement keys (without shift)
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key) && !e.shiftKey) {
               // Allow normal cursor movement which will naturally clear selection
+              // Also hide mention dropdown on cursor movement
+              if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+                setShowMentionDropdown(false);
+              }
             }
             
             // Security: Block dangerous key combinations
@@ -648,6 +872,9 @@ export default function Page() {
             }
           }}
           onClick={(e) => {
+            // Hide mention dropdown on click
+            setShowMentionDropdown(false);
+
             // Preserve text selection when clicking in editor area
             const selection = window.getSelection();
             if (selection.rangeCount > 0 && selection.toString()) {
@@ -684,6 +911,71 @@ export default function Page() {
           }}
         />
       </div>
+
+      {/* User Mention Dropdown */}
+      {showMentionDropdown && (
+        <div 
+          className="mention-dropdown absolute z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-w-xs w-64"
+          style={{
+            top: `${mentionPosition.top}px`,
+            left: `${mentionPosition.left}px`,
+            backgroundColor: 'var(--bg-content)',
+            borderColor: 'var(--border-color)',
+            boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          {mentionSuggestions.length > 0 ? (
+            <div className="py-1">
+              {mentionSuggestions.map((user, index) => (
+                <div
+                  key={user.id || user.username}
+                  className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${
+                    index === selectedMentionIndex 
+                      ? 'bg-blue-50 dark:bg-blue-900/20' 
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => insertMention(user.username)}
+                  onMouseEnter={() => setSelectedMentionIndex(index)}
+                >
+                  <div 
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ 
+                      backgroundColor: 'var(--new-button-bg)', 
+                      color: 'var(--new-button-text)' 
+                    }}
+                  >
+                    {user.username?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div 
+                      className="text-sm font-medium truncate"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      @{user.username}
+                    </div>
+                    {user.display_name && (
+                      <div 
+                        className="text-xs truncate"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {user.display_name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : mentionQuery.length >= 2 ? (
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+              No users found for "{mentionQuery}"
+            </div>
+          ) : (
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+              Type to search users...
+            </div>
+          )}
+        </div>
+      )}
       
       {/* Bottom Bar */}
       <div className="sticky bottom-0 z-30 w-full border-t flex items-center justify-between px-4 py-2 transition-colors duration-300" 
