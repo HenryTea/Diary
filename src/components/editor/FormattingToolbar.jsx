@@ -13,15 +13,11 @@ const FormattingToolbar = React.memo(function FormattingToolbar({
   customFonts,
   recentlyUsedFonts,
   onShowFontDialog,
-  onRemoveCustomFont,
   
   // Font size props
   fontSizeSelected,
-  showCustomInput,
-  customFontSize,
   FONT_SIZES,
   onFontSizeChange,
-  onCustomFontSizeChange,
   
   // Formatting props
   isBold,
@@ -46,16 +42,12 @@ const FormattingToolbar = React.memo(function FormattingToolbar({
         customFonts={customFonts}
         recentlyUsedFonts={recentlyUsedFonts}
         onShowFontDialog={onShowFontDialog}
-        onRemoveCustomFont={onRemoveCustomFont}
       />
       
       <FontSizeSelector
         fontSizeSelected={fontSizeSelected}
-        showCustomInput={showCustomInput}
-        customFontSize={customFontSize}
         FONT_SIZES={FONT_SIZES}
         onFontSizeChange={onFontSizeChange}
-        onCustomFontSizeChange={onCustomFontSizeChange}
       />
       
       <TextFormattingButtons

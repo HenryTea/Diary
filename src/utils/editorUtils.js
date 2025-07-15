@@ -51,14 +51,6 @@ export const applyFontSize = (size, editorRef, onHtmlChange) => {
   selection.removeAllRanges();
   selection.addRange(range);
   
-  // Remove legacy font tags
-  const fonts = editorRef.current.getElementsByTagName('font');
-  while (fonts.length) {
-    const font = fonts[0];
-    const parent = font.parentNode;
-    while (font.firstChild) parent.insertBefore(font.firstChild, font);
-    parent.removeChild(font);
-  }
   
   onHtmlChange();
 };
@@ -170,15 +162,19 @@ export const applyTextColor = (color, editorRef, onHtmlChange) => {
   const range = selection.getRangeAt(0);
   if (!editorRef.current.contains(range.commonAncestorContainer)) return;
   
+  // Save the original selection range
+  const originalRange = range.cloneRange();
+  
   const span = document.createElement('span');
   span.style.color = color;
   span.appendChild(range.extractContents());
   range.insertNode(span);
   
-  range.setStartAfter(span);
-  range.collapse(true);
+  // Restore the selection to cover the newly colored span
+  const newRange = document.createRange();
+  newRange.selectNodeContents(span);
   selection.removeAllRanges();
-  selection.addRange(range);
+  selection.addRange(newRange);
   
   onHtmlChange();
 };

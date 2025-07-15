@@ -14,11 +14,11 @@ export default function CustomFontDialog({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded shadow-lg max-w-md w-full mx-4">
+      <div className="bg-white p-6 rounded shadow-lg max-w-md w-full mx-4" style={{ backgroundColor: 'var(--bg-content)', color: 'var(--text-primary)' }}>
         <h3 className="text-lg font-semibold mb-4">Add Custom Font</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
               Font Name
             </label>
             <input
@@ -26,11 +26,16 @@ export default function CustomFontDialog({
               value={customFontName}
               onChange={e => onFontNameChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ 
+                backgroundColor: 'var(--bg-content)', 
+                color: '#000000',
+                borderColor: 'var(--border-color)'
+              }}
               placeholder="e.g., My Custom Font"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
               Font URL (Google Fonts or CSS Link)
             </label>
             <input
@@ -38,17 +43,27 @@ export default function CustomFontDialog({
               value={customFontUrl}
               onChange={e => onFontUrlChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ 
+                backgroundColor: 'var(--bg-content)', 
+                color: '#000000',
+                borderColor: 'var(--border-color)'
+              }}
               placeholder="https://fonts.googleapis.com/css2?family=... or https://fonts.google.com/specimen/..."
             />
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             <p>You can get Google Font URLs from <a href="https://fonts.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">fonts.google.com</a></p>
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+            className="px-4 py-2 rounded"
+            style={{ 
+              color: 'var(--text-secondary)', 
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)'
+            }}
           >
             Cancel
           </button>

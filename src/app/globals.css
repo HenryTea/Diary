@@ -72,6 +72,6 @@ body {
   filter: brightness(0) saturate(100%) invert(88%) sepia(7%) saturate(209%) hue-rotate(175deg) brightness(97%) contrast(92%);
 }
 
-[data-theme="dark"] .toolbar-icon {
+[data-theme="dark"] .share-icon {
   filter: brightness(0) saturate(100%) invert(88%) sepia(7%) saturate(209%) hue-rotate(175deg) brightness(97%) contrast(92%);
 }

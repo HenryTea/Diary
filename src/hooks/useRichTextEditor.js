@@ -8,8 +8,6 @@ import {
 
 export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDirty) => {
   // Editor state
-  const [customFontSize, setCustomFontSize] = useState(16);
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const [fontSizeSelected, setFontSizeSelected] = useState(16);
   const [selectedFont, setSelectedFont] = useState("inherit");
   const [showFontDialog, setShowFontDialog] = useState(false);
@@ -143,14 +141,7 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
         
         // Detect font size
         let size = parseInt(computed.fontSize, 10);
-        if (FONT_SIZES.includes(size)) {
-          setFontSizeSelected(size);
-          setShowCustomInput(false);
-        } else {
-          setFontSizeSelected(size);
-          setCustomFontSize(size);
-          setShowCustomInput(true);
-        }
+        setFontSizeSelected(size);
         
         // Detect font family
         let fontFamily = computed.fontFamily;
@@ -182,14 +173,38 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
 
   // Click outside handler for color picker
   useEffect(() => {
+    if (!showColorPicker) return;
+
     const handleClickOutside = (event) => {
-      if (showColorPicker && !event.target.closest('.color-picker-container')) {
+      // Completely skip if color picker is interacting
+      if (window.colorPickerInteracting) {
+        return;
+      }
+      
+      // Check if click is within color picker container
+      const colorPickerContainer = event.target.closest('.color-picker-container');
+      
+      if (!colorPickerContainer) {
         setShowColorPicker(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Add a small delay before attaching the handler
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColorPicker]);
+
+  // Initialize global state when color picker opens
+  useEffect(() => {
+    if (showColorPicker) {
+      window.colorPickerInteracting = false;
+    }
   }, [showColorPicker]);
 
   // Font handling functions
@@ -245,25 +260,6 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     setShowFontDialog(false);
   };
 
-  const handleRemoveCustomFont = (fontToRemove) => {
-    const fontName = typeof fontToRemove === 'string' ? fontToRemove : fontToRemove.name;
-    
-    // Remove from custom fonts
-    setCustomFonts(prev => prev.filter(font => 
-      (typeof font === 'string' ? font : font.name) !== fontName
-    ));
-    
-    // Remove from recently used fonts
-    setRecentlyUsedFonts(prev => prev.filter(font => font !== fontName));
-    
-    // Remove CSS link from document head
-    const linkId = `custom-font-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
-    const linkElement = document.getElementById(linkId);
-    if (linkElement) {
-      linkElement.remove();
-    }
-  };
-
   const clearAllCustomFonts = () => {
     // Clear localStorage
     localStorage.removeItem('diary-custom-fonts');
@@ -283,8 +279,6 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     editorRef,
     
     // State
-    customFontSize,
-    showCustomInput,
     fontSizeSelected,
     selectedFont,
     showFontDialog,
@@ -304,8 +298,6 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     GOOGLE_FONTS,
     
     // Setters
-    setCustomFontSize,
-    setShowCustomInput,
     setFontSizeSelected,
     setSelectedFont,
     setShowFontDialog,
@@ -319,7 +311,6 @@ export const useRichTextEditor = (entry, originalHtml, setOriginalHtml, setIsDir
     handleHtmlChange,
     handleFontUrlChange,
     handleAddCustomFont,
-    handleRemoveCustomFont,
     clearAllCustomFonts
   };
 };

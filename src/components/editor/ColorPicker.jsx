@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 const themeColors = [
   '#000000', '#434343', '#666666', '#999999', '#B7B7B7', '#CCCCCC', '#D9D9D9', '#EEEEEE', '#F3F3F3', '#FFFFFF',
@@ -16,6 +16,31 @@ export default function ColorPicker({
   onToggleColorPicker,
   onColorChange
 }) {
+  const colorPickerRef = useRef(null);
+
+  // Close color picker when clicking outside (but not in editor area)
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target) && showColorPicker) {
+        // Check if the click was on the color picker button itself
+        const colorPickerButton = event.target.closest('.color-picker-container');
+        if (!colorPickerButton) {
+          // Don't close if clicking in the editor area
+          const editorArea = event.target.closest('[contenteditable]');
+          if (!editorArea) {
+            onToggleColorPicker();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColorPicker, onToggleColorPicker]);
+
   return (
     <div className="relative color-picker-container">
       <button 
@@ -32,15 +57,27 @@ export default function ColorPicker({
       
       {/* Color Picker Dialog */}
       {showColorPicker && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-3 z-50" style={{ width: '240px' }}>
+        <div 
+          ref={colorPickerRef}
+          className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-3 z-50" 
+          style={{ 
+            width: '240px',
+            backgroundColor: 'var(--bg-content)',
+            borderColor: 'var(--border-color)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="mb-3">
-            <div className="text-xs font-medium text-gray-700 mb-2">Theme Colors</div>
+            <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Theme Colors</div>
             <div className="grid grid-cols-10 gap-1">
               {themeColors.map((color, index) => (
                 <button
                   key={`theme-${index}`}
-                  className="w-5 h-5 rounded border border-gray-300 hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color }}
+                  className="w-5 h-5 rounded border hover:scale-110 transition-transform"
+                  style={{ 
+                    backgroundColor: color,
+                    borderColor: 'var(--border-color)'
+                  }}
                   onClick={() => onColorChange(color)}
                   title={color}
                 />
@@ -49,13 +86,16 @@ export default function ColorPicker({
           </div>
           
           <div className="mb-3">
-            <div className="text-xs font-medium text-gray-700 mb-2">Standard Colors</div>
+            <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Standard Colors</div>
             <div className="grid grid-cols-10 gap-1">
               {standardColors.map((color, index) => (
                 <button
                   key={`standard-${index}`}
-                  className="w-5 h-5 rounded border border-gray-300 hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color }}
+                  className="w-5 h-5 rounded border hover:scale-110 transition-transform"
+                  style={{ 
+                    backgroundColor: color,
+                    borderColor: 'var(--border-color)'
+                  }}
                   onClick={() => onColorChange(color)}
                   title={color}
                 />
@@ -63,13 +103,14 @@ export default function ColorPicker({
             </div>
           </div>
           
-          <div className="border-t pt-2">
-            <div className="text-xs font-medium text-gray-700 mb-2">Custom Color</div>
+          <div className="border-t pt-2" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Custom Color</div>
             <input
               type="color"
               value={selectedColor}
               onChange={(e) => onColorChange(e.target.value)}
-              className="w-full h-8 rounded border border-gray-300 cursor-pointer"
+              className="w-full h-8 rounded border cursor-pointer"
+              style={{ borderColor: 'var(--border-color)' }}
             />
           </div>
         </div>

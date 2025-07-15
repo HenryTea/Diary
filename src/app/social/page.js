@@ -771,7 +771,7 @@ export default function SocialPage() {
       <main className="pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 mx-auto min-h-screen transition-colors duration-300" 
             style={{ backgroundColor: 'var(--bg-primary)', maxWidth: 'none', width: '100%' }}>
       <div className="max-w-3xl mx-auto">
-        <div className="sticky top-20 sm:top-24 z-30 flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 py-3 sm:py-4 transition-colors duration-300 bg-opacity-95 backdrop-blur-sm gap-4 sm:gap-0"
+        <div className="top-20 sm:top-24 z-30 flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 py-3 sm:py-4 transition-colors duration-300 bg-opacity-95 backdrop-blur-sm gap-4 sm:gap-0"
              style={{ backgroundColor: 'var(--bg-primary)' }}>
           <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <h2 className="text-xl sm:text-2xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>

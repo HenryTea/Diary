@@ -304,7 +304,15 @@ export default function Page() {
       return;
     }
     
-    router.push("/");
+    console.log('Save completed successfully, attempting to navigate back to main page...');
+    try {
+      router.replace("/");
+      console.log('Navigation initiated to main page');
+    } catch (navError) {
+      console.error('Navigation failed:', navError);
+      // Fallback navigation
+      window.location.href = "/";
+    }
   };
 
   const handleSaveAndBack = async () => {
@@ -312,12 +320,6 @@ export default function Page() {
     const userId = user?.id || 'anonymous';
     if (!saveLimiter.isAllowed(userId)) {
       alert('Too many save attempts. Please wait before trying again.');
-      return;
-    }
-    
-    // Security: Validate entry ID
-    if (!validateEntryId(id)) {
-      alert('Invalid entry ID');
       return;
     }
     
@@ -361,16 +363,10 @@ export default function Page() {
   };
 
   const handleDelete = async () => {
-    // Security: Validate entry ID
-    if (!validateEntryId(id)) {
-      alert('Invalid entry ID');
-      return;
-    }
-    
     if (id === 'new') {
       // Can't delete a new entry that hasn't been saved yet
       if (window.confirm("Discard this new entry?")) {
-        router.push("/");
+        router.replace("/");
       }
       return;
     }
@@ -391,7 +387,7 @@ export default function Page() {
           body: JSON.stringify({ id: sanitizeInput(id) }),
           credentials: 'include'
         });
-        router.push("/");
+        router.replace("/");
       } catch (error) {
         console.error('Delete failed:', error);
         alert('Failed to delete entry: ' + sanitizeInput(error.message || String(error)));
@@ -401,18 +397,8 @@ export default function Page() {
 
   // Formatting handlers - MEMOIZED for better performance
   const handleFontSizeChange = useCallback((value) => {
-    if (value === 'custom') {
-      editor.setShowCustomInput(true);
-    } else {
-      editor.setShowCustomInput(false);
-      editor.setFontSizeSelected(Number(value));
-      applyFontSize(Number(value), editor.editorRef, editor.handleHtmlChange);
-    }
-  }, [editor]);
-
-  const handleCustomFontSizeChange = useCallback((size) => {
-    editor.setCustomFontSize(size);
-    applyFontSize(size, editor.editorRef, editor.handleHtmlChange);
+    editor.setFontSizeSelected(Number(value));
+    applyFontSize(Number(value), editor.editorRef, editor.handleHtmlChange);
   }, [editor]);
 
   const handleFontChange = useCallback((fontFamily) => {
@@ -448,7 +434,7 @@ export default function Page() {
   const handleColorChange = useCallback((color) => {
     applyTextColor(color, editor.editorRef, editor.handleHtmlChange);
     editor.setSelectedColor(color);
-    editor.setShowColorPicker(false);
+    // Don't auto-close the color picker - let user close it manually
   }, [editor]);
 
   const handleToggleColorPicker = useCallback(() => {
@@ -467,11 +453,8 @@ export default function Page() {
     
     // Font size props
     fontSizeSelected: editor.fontSizeSelected,
-    showCustomInput: editor.showCustomInput,
-    customFontSize: editor.customFontSize,
     FONT_SIZES: editor.FONT_SIZES,
     onFontSizeChange: handleFontSizeChange,
-    onCustomFontSizeChange: handleCustomFontSizeChange,
     
     // Formatting props
     isBold: editor.isBold,
@@ -486,7 +469,7 @@ export default function Page() {
     showColorPicker: editor.showColorPicker,
     onToggleColorPicker: handleToggleColorPicker,
     onColorChange: handleColorChange,
-  }), [editor, handleFontSizeChange, handleCustomFontSizeChange, handleFontChange, 
+  }), [editor, handleFontSizeChange, handleFontChange, 
        handleBold, handleItalic, handleUnderline, handleColorChange, handleToggleColorPicker]);
 
   // Show consistent loading until mounted and auth is determined
@@ -562,7 +545,7 @@ export default function Page() {
           <SaveButton 
             isDirty={isDirty}
             onSave={handleSaveAndBack}
-            onBack={() => router.push("/")}
+            onBack={() => router.replace("/")}
             saveText={id === 'new' ? "Create" : "Save"}
           />
           
@@ -615,7 +598,7 @@ export default function Page() {
             // Only update if content changed to prevent infinite loops
             if (sanitized !== content) {
               e.target.innerHTML = sanitized;
-              // Set cursor to end
+              // Preserve cursor position after sanitization
               const range = document.createRange();
               const sel = window.getSelection();
               range.selectNodeContents(e.target);
@@ -647,6 +630,11 @@ export default function Page() {
             editor.handleHtmlChange({ target: e.target });
           }}
           onKeyDown={(e) => {
+            // Clear selection on cursor movement keys (without shift)
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key) && !e.shiftKey) {
+              // Allow normal cursor movement which will naturally clear selection
+            }
+            
             // Security: Block dangerous key combinations
             if (e.ctrlKey || e.metaKey) {
               // Allow common editing shortcuts but block potentially dangerous ones
@@ -658,6 +646,41 @@ export default function Page() {
                 }
               }
             }
+          }}
+          onClick={(e) => {
+            // Preserve text selection when clicking in editor area
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && selection.toString()) {
+              // Text is selected, check if color picker is open
+              const colorPickerOpen = editor.showColorPicker;
+              
+              if (colorPickerOpen) {
+                // Color picker is open, always preserve selection for color preview
+                e.preventDefault();
+                return;
+              }
+              
+              // Color picker not open, check if click is within selection
+              try {
+                const range = selection.getRangeAt(0);
+                const clickedRange = document.caretRangeFromPoint(e.clientX, e.clientY);
+                
+                if (clickedRange) {
+                  // Check if click is within the selected range
+                  const isWithinSelection = range.isPointInRange(clickedRange.startContainer, clickedRange.startOffset);
+                  if (isWithinSelection) {
+                    // Click is within selection, preserve it
+                    e.preventDefault();
+                    return;
+                  }
+                }
+              } catch (error) {
+                // Fallback: preserve selection on any error
+                e.preventDefault();
+                return;
+              }
+            }
+            // Allow normal click behavior for cursor positioning
           }}
         />
       </div>

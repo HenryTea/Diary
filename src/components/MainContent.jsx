@@ -472,7 +472,7 @@ export default function MainContent() {
                   title="Share entry"
                   onClick={e => handleShare(entry, e)}
                 >
-                  <Image src="/icon/share.svg" alt="Share" width={20} height={20} />
+                  <Image src="/icon/share.svg" alt="Share" width={20} height={20} className="share-icon" />
                 </button>
                 <div className="font-bold mb-1 transition-colors duration-300" style={{ color: '#72b3c8' }}>
                   {new Date(entry.date).toLocaleString('en-US', {
